@@ -9,7 +9,7 @@ export default defineConfig({
   pwa: {
     name: "Barani Better Homes",
     shortName: "Barani Homes",
-    themeColor: "#282270",
+    themeColor: "#111322",
     backgroundColor: "#ffffff",
   },
   auth: {

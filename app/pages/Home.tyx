@@ -79,84 +79,105 @@ onMount
 template
   <div>
     <section class="bb-hero">
-      <span class="bb-hero-orb w-[34rem] h-[34rem] -right-48 -top-56" aria-hidden="true"></span>
-      <span class="bb-hero-orb w-40 h-40 -left-16 bottom-10 opacity-60" aria-hidden="true"></span>
-      <div class="max-w-7xl mx-auto px-4 sm:px-8 pt-10 pb-12 sm:pt-16 sm:pb-16 lg:py-20 grid lg:grid-cols-[1.25fr_1fr] gap-10 lg:gap-14 items-center">
+      <span class="bb-hero-grid" aria-hidden="true"></span>
+      <span class="bb-hero-skyline" aria-hidden="true"></span>
+      <div class="relative max-w-7xl mx-auto px-4 sm:px-8 pt-10 pb-16 sm:pt-16 sm:pb-24 lg:pt-20 lg:pb-28 grid lg:grid-cols-[1.2fr_1fr] gap-12 lg:gap-16 items-center">
         <div class="min-w-0">
-          <p class="tx-eyebrow mb-4">{{ Site.settings.tagline }}</p>
-          <h1 class="text-[2rem] leading-[1.1] sm:text-5xl lg:text-[3.4rem] font-bold tracking-tight max-w-3xl">{{ Site.settings.hero_title }}</h1>
-          <p class="mt-4 text-base sm:text-lg text-white/75 max-w-xl leading-relaxed">{{ Site.settings.hero_subtitle }}</p>
+          <p class="bb-hero-kicker"><IconSparkles class="w-3.5 h-3.5" /> {{ Site.settings.tagline }}</p>
+          <h1 class="mt-5 text-[2.3rem] leading-[1.04] sm:text-[3.4rem] lg:text-[4.1rem] font-extrabold tracking-[-0.035em] max-w-3xl">{{ Site.settings.hero_title }}</h1>
+          <p class="mt-5 text-base sm:text-lg text-white/70 max-w-xl leading-relaxed">{{ Site.settings.hero_subtitle }}</p>
 
-          <form onsubmit.prevent="{{ search() }}" class="mt-8 bg-panel text-ink rounded-3xl p-3 sm:p-4 shadow-2xl shadow-black/20" role="search" aria-label="Find a property">
-            <div class="flex items-center justify-between gap-3 mb-3">
+          <form onsubmit.prevent="{{ search() }}" class="bb-search mt-8" role="search" aria-label="Find a property">
+            <div class="flex items-center justify-between gap-3 mb-3 px-1">
               <div class="bb-seg" role="radiogroup" aria-label="Rent or buy">
                 <label class="{{ segClass('rent') }}"><input type="radio" class="sr-only" value="rent" bind:group="{{ purpose }}" /> Rent</label>
                 <label class="{{ segClass('sale') }}"><input type="radio" class="sr-only" value="sale" bind:group="{{ purpose }}" /> Buy</label>
               </div>
-              <a href="/vacant-units" class="hidden sm:inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-ink"><span class="bb-dot bb-dot-ok"></span> {{ vacantTotal }} vacant today</a>
+              <a href="/vacant-units" class="inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-ink"><span class="bb-dot bb-dot-ok bb-pulse"></span> {{ vacantTotal }} vacant today</a>
             </div>
-            <div class="grid grid-cols-1 sm:grid-cols-[1fr_190px_auto] gap-2">
-              <label class="sr-only" for="hero-q">Area, estate or keyword</label>
-              <div class="relative">
-                <IconMapPin class="w-4 h-4 text-muted absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <input id="hero-q" class="tx-input !mb-0 !pl-10" placeholder="Area or estate, e.g. Nyali, Kilimani" bind:value="{{ q }}" />
-              </div>
-              <label class="sr-only" for="hero-category">Property type</label>
-              <select id="hero-category" class="tx-input !mb-0" bind:value="{{ category }}">
-                <option value="">Any type</option>
+            <div class="grid grid-cols-1 sm:grid-cols-[1fr_200px_auto] gap-2">
+              <label class="bb-field" for="hero-q">
+                <span class="bb-field-label">Where</span>
+                <span class="flex items-center gap-2">
+                  <IconMapPin class="w-4 h-4 text-brand shrink-0" />
+                  <input id="hero-q" class="bb-field-input" placeholder="Nyali, Kilimani, Westlands…" bind:value="{{ q }}" />
+                </span>
+              </label>
+              <label class="bb-field" for="hero-category">
+                <span class="bb-field-label">Property type</span>
+                <select id="hero-category" class="bb-field-input bb-field-select" bind:value="{{ category }}">
+                  <option value="">Any type</option>
 {{#each c in Site.categories}}
-                <option value="{{ c.key }}">{{ c.label }}</option>
+                  <option value="{{ c.key }}">{{ c.label }}</option>
 {{/each}}
-              </select>
-              <button type="submit" class="tx-btn tx-btn-primary !rounded-[11px] px-6"><IconSearch class="w-4 h-4" /> Search</button>
+                </select>
+              </label>
+              <button type="submit" class="tx-btn tx-btn-primary bb-search-btn"><IconSearch class="w-[18px] h-[18px]" /> Search</button>
             </div>
           </form>
 
-          <div class="mt-5 flex flex-wrap gap-2">
-            <a href="/vacant-units" class="bb-hero-pill sm:hidden"><span class="bb-dot bb-dot-ok"></span> {{ vacantTotal }} vacant today</a>
-            <a href="/rent" class="bb-hero-pill">{{ purposeCounts.rent }} to let</a>
-            <a href="/buy" class="bb-hero-pill">{{ purposeCounts.sale }} for sale</a>
-            <a href="/land" class="bb-hero-pill">{{ count("land") }} {{ count("land") is 1 ? "plot" : "plots" }}</a>
+          <div class="mt-8 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-0 sm:gap-y-4">
+            <a href="/rent" class="bb-stat"><span class="bb-stat-num">{{ purposeCounts.rent }}</span><span class="bb-stat-label">To let</span></a>
+            <a href="/buy" class="bb-stat"><span class="bb-stat-num">{{ purposeCounts.sale }}</span><span class="bb-stat-label">For sale</span></a>
+            <a href="/land" class="bb-stat"><span class="bb-stat-num">{{ count("land") }}</span><span class="bb-stat-label">{{ count("land") is 1 ? "Plot" : "Plots" }} of land</span></a>
+            <a href="/vacant-units" class="bb-stat"><span class="bb-stat-num">{{ vacantTotal }}</span><span class="bb-stat-label"><span class="bb-dot bb-dot-ok"></span> Vacant today</span></a>
           </div>
         </div>
 
         <aside class="hidden lg:block" aria-label="Vacant today">
-          <div class="bg-panel text-ink rounded-3xl p-5 shadow-2xl shadow-black/25">
-            <div class="flex items-center justify-between mb-4">
-              <div>
-                <p class="font-semibold">Vacant today</p>
-                <p class="text-xs text-muted">Straight from the landlord's records</p>
+          <div class="bb-hero-stack">
+            <span class="bb-hero-stack-back" aria-hidden="true"></span>
+            <div class="relative bg-panel text-ink rounded-[26px] p-5 shadow-2xl shadow-black/30 ring-1 ring-white/10">
+              <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-3">
+                  <span class="bb-icon-tile bb-icon-tile-sm bb-tint-leaf"><IconKey /></span>
+                  <div>
+                    <p class="font-bold leading-tight">Vacant today</p>
+                    <p class="text-xs text-muted">Straight from the landlord's records</p>
+                  </div>
+                </div>
+                <span class="bb-chip bb-chip-ok"><span class="bb-dot bb-dot-ok bb-pulse"></span> Live</span>
               </div>
-              <span class="bb-icon-tile bb-icon-tile-sm bb-tint-leaf"><IconKey /></span>
-            </div>
 {{#if loading}}
-            <div class="space-y-2"><div class="h-16 rounded-2xl bg-well animate-pulse"></div><div class="h-16 rounded-2xl bg-well animate-pulse"></div><div class="h-16 rounded-2xl bg-well animate-pulse"></div></div>
+              <div class="space-y-2"><div class="h-[68px] rounded-2xl bg-well animate-pulse"></div><div class="h-[68px] rounded-2xl bg-well animate-pulse"></div><div class="h-[68px] rounded-2xl bg-well animate-pulse"></div></div>
 {{#else if vacantUnits.length is 0}}
-            <p class="text-sm text-muted rounded-2xl bg-raised p-4">Every unit is let right now. New vacancies appear here the day they open up.</p>
+              <p class="text-sm text-muted rounded-2xl bg-raised p-4">Every unit is let right now. New vacancies appear here the day they open up.</p>
 {{#else}}
-            <ul class="space-y-2">
+              <ul class="space-y-2">
 {{#each u in heroUnits}}
-              <li>
-                <a href="{{ `/properties/${u.listing.slug}` }}" class="flex items-center gap-3 rounded-2xl border border-line p-3 hover:border-brand/40 hover:bg-raised transition-colors">
-                  <span class="bb-icon-tile bb-icon-tile-sm bb-tint-lilac"><IconHome /></span>
-                  <span class="min-w-0 flex-1">
-                    <span class="block text-sm font-semibold truncate">{{ u.listing.title }} · {{ u.name }}</span>
-                    <span class="block text-xs text-muted truncate">{{ u.type }} · {{ u.listing.location }}</span>
-                  </span>
-                  <span class="text-sm font-bold whitespace-nowrap">{{ Fmt.price(u.rent, "rent") }}</span>
-                </a>
-              </li>
+                <li>
+                  <a href="{{ `/properties/${u.listing.slug}` }}" class="group flex items-center gap-3 rounded-2xl border border-line p-3 hover:border-brand/40 hover:bg-raised transition-colors">
+                    <span class="bb-icon-tile bb-icon-tile-sm bb-tint-lilac"><IconHome /></span>
+                    <span class="min-w-0 flex-1">
+                      <span class="block text-sm font-semibold truncate">{{ u.listing.title }} · {{ u.name }}</span>
+                      <span class="block text-xs text-muted truncate">{{ u.type }} · {{ u.listing.location }}</span>
+                    </span>
+                    <span class="text-right">
+                      <span class="block text-sm font-bold whitespace-nowrap">{{ Fmt.price(u.rent, "rent") }}</span>
+                      <span class="block text-[11px] font-semibold text-brand opacity-0 group-hover:opacity-100 transition-opacity">View unit →</span>
+                    </span>
+                  </a>
+                </li>
 {{/each}}
-            </ul>
+              </ul>
 {{/if}}
-            <div class="mt-4 rounded-2xl bg-lilac p-4">
-              <p class="tx-eyebrow mb-2.5">How it works</p>
-              <ol class="space-y-2 text-sm text-soft">
-                <li class="flex items-center gap-2.5"><span class="bb-step !w-6 !h-6 !text-[11px]">1</span> Pick a unit and a day to view</li>
-                <li class="flex items-center gap-2.5"><span class="bb-step !w-6 !h-6 !text-[11px]">2</span> An agent calls to confirm</li>
-                <li class="flex items-center gap-2.5"><span class="bb-step !w-6 !h-6 !text-[11px]">3</span> Apply online when it's the one</li>
-              </ol>
+              <div class="mt-4 rounded-2xl bg-lilac p-4">
+                <p class="tx-eyebrow mb-2.5">How it works</p>
+                <ol class="space-y-2 text-sm text-soft">
+                  <li class="flex items-center gap-2.5"><span class="bb-step !w-6 !h-6 !text-[11px]">1</span> Pick a unit and a day to view</li>
+                  <li class="flex items-center gap-2.5"><span class="bb-step !w-6 !h-6 !text-[11px]">2</span> An agent calls to confirm</li>
+                  <li class="flex items-center gap-2.5"><span class="bb-step !w-6 !h-6 !text-[11px]">3</span> Apply online when it's the one</li>
+                </ol>
+              </div>
+              <a href="/vacant-units" class="mt-3 flex items-center justify-end gap-1.5 pr-1 text-sm font-semibold text-brand hover:underline">See all {{ vacantTotal }} vacant units <IconArrowRight class="w-4 h-4" /></a>
             </div>
+            <a href="/tenant" class="bb-hero-float">
+              <span class="bb-icon-tile bb-icon-tile-sm bb-tint-butter"><IconMobileMoney /></span>
+              <span>
+                <span class="block text-sm font-bold leading-tight">Pay rent by M-Pesa</span>
+                <span class="block text-xs text-muted">In the tenant portal</span>
+              </span>
+            </a>
           </div>
         </aside>
       </div>
@@ -295,11 +316,11 @@ template
       <div class="rounded-[28px] bg-night text-white p-6 sm:p-10 grid lg:grid-cols-[1.1fr_1fr] gap-8 lg:gap-12 items-center relative overflow-hidden isolate">
         <span class="bb-hero-orb w-80 h-80 -right-24 -bottom-32" aria-hidden="true"></span>
         <div>
-          <p class="tx-eyebrow !text-[#C4BAFF] mb-3">For landlords</p>
+          <p class="tx-eyebrow !text-[#93C5FD] mb-3">For landlords</p>
           <h2 id="landlords-heading" class="text-2xl sm:text-4xl font-bold tracking-tight leading-tight">Own a rental? We'll collect the rent and run the building.</h2>
           <p class="mt-3 text-white/70 leading-relaxed max-w-xl">From a single unit to a whole block, we find and vet tenants, collect rent, follow up arrears and handle repairs, so you don't have to.</p>
           <div class="mt-6 flex flex-wrap gap-2">
-            <a href="/contact?topic=landlord" class="tx-btn bg-white !text-[#1B183D] hover:bg-lilac">Talk to us about your property <IconArrowRight class="w-4 h-4" /></a>
+            <a href="/contact?topic=landlord" class="tx-btn bg-white !text-[#111827] hover:bg-[#E8F2FC]">Talk to us about your property <IconArrowRight class="w-4 h-4" /></a>
 {{#if Site.settings.whatsapp}}
             <a href="{{ Fmt.whatsapp(Site.settings.whatsapp, 'Hello Barani Better Homes, I own a rental property and would like to talk about management.') }}" target="_blank" rel="noopener" class="tx-btn text-white border-white/20 hover:bg-white/10"><IconWhatsapp class="w-4 h-4" /> WhatsApp</a>
 {{/if}}

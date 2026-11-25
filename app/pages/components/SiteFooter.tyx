@@ -1,6 +1,6 @@
 component SiteFooter
 
-import { IconPhone, IconMail, IconMapPin, IconWhatsapp } from "tylix-icons"
+import { IconPhone, IconMail, IconMapPin, IconWhatsapp, IconArrowRight, IconClock } from "tylix-icons"
 
 uses
   Site
@@ -29,75 +29,86 @@ onMount
   }
 
 template
-  <footer class="mt-20 px-0 sm:px-3 sm:pb-3">
-    <div class="bb-footer sm:rounded-[28px] overflow-hidden">
-      <div class="max-w-7xl mx-auto px-5 sm:px-8 pt-12 pb-10 grid grid-cols-2 md:grid-cols-12 gap-x-6 gap-y-10">
-        <div class="col-span-2 md:col-span-4">
-          <a href="/" class="!text-white flex items-center gap-2.5 mb-4">
-            <span class="bb-logo"><img src="/barani-mark.png" alt="" width="97" height="87" /></span>
-            <span class="text-[17px] font-bold tracking-tight">{{ Site.settings.site_name }}</span>
-          </a>
-          <p class="text-sm leading-relaxed max-w-xs opacity-75">{{ Site.settings.about_short }}</p>
-          <div class="flex flex-wrap gap-2 mt-5">
-{{#if Site.settings.phone}}
-            <a href="{{ `tel:${Site.settings.phone}` }}" class="bb-hero-pill"><IconPhone class="w-4 h-4" /> Call</a>
-{{/if}}
+  <footer class="mt-20">
+    <div class="bb-footer">
+
+      <div class="relative max-w-7xl mx-auto px-5 sm:px-8 pt-10 sm:pt-12">
+        <div class="bb-footer-cta">
+          <div class="max-w-2xl">
+            <p class="text-xs font-bold uppercase tracking-[0.14em] text-white/50 mb-2">Can't see the right place?</p>
+            <h2 class="text-2xl sm:text-[1.9rem] font-bold tracking-tight leading-tight text-balance">Tell us what you need and we'll find it for you.</h2>
+            <p class="mt-2 text-sm text-white/65">Homes, land or business space: our agents know what's coming up before it's listed.</p>
+          </div>
+          <div class="flex flex-wrap gap-2 shrink-0">
+            <a href="/contact" class="tx-btn bg-white !text-[#111827] hover:bg-[#E8F2FC]">Send us a message <IconArrowRight class="w-4 h-4" /></a>
 {{#if Site.settings.whatsapp}}
-            <a href="{{ Fmt.whatsapp(Site.settings.whatsapp, '') }}" class="bb-hero-pill" rel="noopener" target="_blank"><IconWhatsapp class="w-4 h-4" /> WhatsApp</a>
-{{/if}}
-{{#if Site.settings.email}}
-            <a href="{{ `mailto:${Site.settings.email}` }}" class="bb-hero-pill"><IconMail class="w-4 h-4" /> Email</a>
+            <a href="{{ Fmt.whatsapp(Site.settings.whatsapp, '') }}" class="tx-btn !text-white border-white/25 hover:bg-white/10" target="_blank" rel="noopener"><IconWhatsapp class="w-4 h-4" /> WhatsApp</a>
 {{/if}}
           </div>
         </div>
+      </div>
 
-        <div class="md:col-span-2 md:col-start-6">
-          <h2 class="text-xs font-bold uppercase tracking-[0.12em] mb-4">Browse</h2>
+      <div class="relative max-w-7xl mx-auto px-5 sm:px-8 pt-12 pb-10 grid grid-cols-2 md:grid-cols-12 gap-x-6 gap-y-10">
+        <div class="col-span-2 md:col-span-4">
+          <a href="/" class="!text-white inline-flex items-center gap-2.5 mb-4">
+            <span class="bb-logo"><img src="/barani-mark.png" alt="" width="97" height="87" /></span>
+            <span class="text-[17px] font-bold tracking-tight">{{ Site.settings.site_name }}</span>
+          </a>
+          <p class="text-sm leading-relaxed max-w-sm text-white/65">{{ Site.settings.about_short }}</p>
+{{#if Site.settings.office_hours}}
+          <p class="mt-5 inline-flex items-center gap-2 rounded-full bg-white/[0.07] border border-white/10 px-3 py-1.5 text-xs text-white/80"><IconClock class="w-3.5 h-3.5" /> {{ Site.settings.office_hours }}</p>
+{{/if}}
+        </div>
+
+        <nav class="md:col-span-2 md:col-start-6" aria-label="Browse">
+          <h2 class="bb-footer-heading">Browse</h2>
           <ul class="space-y-2.5">
 {{#each link in browse}}
-            <li><a href="{{ link.href }}" class="text-sm">{{ link.label }}</a></li>
+            <li><a href="{{ link.href }}" class="bb-footer-link">{{ link.label }}</a></li>
 {{/each}}
           </ul>
-        </div>
+        </nav>
 
-        <div class="md:col-span-2">
-          <h2 class="text-xs font-bold uppercase tracking-[0.12em] mb-4">Your account</h2>
+        <nav class="md:col-span-2" aria-label="Your account">
+          <h2 class="bb-footer-heading">Your account</h2>
           <ul class="space-y-2.5">
 {{#each link in account}}
-            <li><a href="{{ link.href }}" class="text-sm">{{ link.label }}</a></li>
+            <li><a href="{{ link.href }}" class="bb-footer-link">{{ link.label }}</a></li>
 {{/each}}
 {{#each page in Site.pages}}
-            <li><a href="{{ `/p/${page.slug}` }}" class="text-sm">{{ page.title }}</a></li>
+            <li><a href="{{ `/p/${page.slug}` }}" class="bb-footer-link">{{ page.title }}</a></li>
 {{/each}}
           </ul>
-        </div>
+        </nav>
 
         <div class="col-span-2 md:col-span-3">
-          <h2 class="text-xs font-bold uppercase tracking-[0.12em] mb-4">Talk to us</h2>
-          <ul class="space-y-2.5 text-sm">
+          <h2 class="bb-footer-heading">Talk to us</h2>
+          <ul class="space-y-3 text-sm">
 {{#if Site.settings.phone}}
-            <li><a href="{{ `tel:${Site.settings.phone}` }}" class="flex items-center gap-2"><IconPhone class="w-4 h-4 shrink-0" /> {{ Site.settings.phone }}</a></li>
+            <li><a href="{{ `tel:${Site.settings.phone}` }}" class="bb-footer-contact"><span class="bb-footer-icon"><IconPhone class="w-4 h-4" /></span> <span><span class="block text-[11px] uppercase tracking-wider text-white/45">Call</span>{{ Site.settings.phone }}</span></a></li>
 {{/if}}
 {{#if Site.settings.whatsapp}}
-            <li><a href="{{ Fmt.whatsapp(Site.settings.whatsapp, '') }}" class="flex items-center gap-2" target="_blank" rel="noopener"><IconWhatsapp class="w-4 h-4 shrink-0" /> {{ Site.settings.whatsapp }}</a></li>
+            <li><a href="{{ Fmt.whatsapp(Site.settings.whatsapp, '') }}" class="bb-footer-contact" target="_blank" rel="noopener"><span class="bb-footer-icon"><IconWhatsapp class="w-4 h-4" /></span> <span><span class="block text-[11px] uppercase tracking-wider text-white/45">WhatsApp</span>{{ Site.settings.whatsapp }}</span></a></li>
 {{/if}}
 {{#if Site.settings.email}}
-            <li><a href="{{ `mailto:${Site.settings.email}` }}" class="flex items-center gap-2 break-all"><IconMail class="w-4 h-4 shrink-0" /> {{ Site.settings.email }}</a></li>
+            <li><a href="{{ `mailto:${Site.settings.email}` }}" class="bb-footer-contact"><span class="bb-footer-icon"><IconMail class="w-4 h-4" /></span> <span class="min-w-0"><span class="block text-[11px] uppercase tracking-wider text-white/45">Email</span><span class="block break-all">{{ Site.settings.email }}</span></span></a></li>
 {{/if}}
 {{#if Site.settings.address}}
-            <li class="flex items-start gap-2 opacity-75"><IconMapPin class="w-4 h-4 mt-0.5 shrink-0" /> {{ Site.settings.address }}</li>
+            <li class="bb-footer-contact"><span class="bb-footer-icon"><IconMapPin class="w-4 h-4" /></span> <span><span class="block text-[11px] uppercase tracking-wider text-white/45">Visit</span><span class="text-white/75">{{ Site.settings.address }}</span></span></li>
 {{/if}}
-{{#if Site.settings.office_hours}}
-            <li class="flex items-center gap-2 text-xs opacity-75"><span class="bb-dot bb-dot-ok"></span> {{ Site.settings.office_hours }}</li>
-{{/if}}
-            <li><a href="/contact" class="font-semibold !text-white hover:underline">Send us a message →</a></li>
           </ul>
         </div>
       </div>
-      <div class="border-t border-white/10">
-        <div class="max-w-7xl mx-auto px-5 sm:px-8 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-2 text-xs opacity-70">
+
+      <p class="bb-footer-wordmark" aria-hidden="true">{{ Site.settings.site_name }}</p>
+
+      <div class="relative border-t border-white/10">
+        <div class="max-w-7xl mx-auto px-5 sm:px-8 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-xs text-white/55">
           <p>© {{ year }} {{ Site.settings.site_name }}. Rental availability is updated automatically.</p>
-          <p>Designed and developed by <a href="https://ashmif.com" class="font-semibold underline-offset-2 hover:underline" target="_blank" rel="noopener">Ashmif Office Solutions</a> · Built with <a href="https://tylix.dev" class="font-semibold underline-offset-2 hover:underline" target="_blank" rel="noopener">Tylix</a></p>
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <p>Designed and developed by <a href="https://ashmif.com" class="font-semibold !text-white/80 hover:!text-white underline-offset-2 hover:underline" target="_blank" rel="noopener">Ashmif Office Solutions</a></p>
+            <a href="https://tylix.dev" class="bb-tylix" target="_blank" rel="noopener" aria-label="Built with Tylix"><span class="font-medium text-[#64748B]">Built with</span> <img src="/logo-mark.svg" alt="" width="552" height="366" /> Tylix</a>
+          </div>
         </div>
       </div>
     </div>

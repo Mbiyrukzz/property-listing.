@@ -61,7 +61,7 @@ template
         <h1 class="text-[2rem] leading-[1.1] sm:text-5xl font-bold tracking-tight max-w-3xl">{{ page.title }}</h1>
         <p class="mt-4 text-base sm:text-lg text-white/75 max-w-2xl leading-relaxed">{{ Site.settings.about_short }}</p>
         <div class="mt-6 flex flex-wrap gap-2">
-          <a href="/contact?topic=landlord" class="tx-btn bg-white !text-[#1B183D] hover:bg-lilac">I'm a landlord <IconArrowRight class="w-4 h-4" /></a>
+          <a href="/contact?topic=landlord" class="tx-btn bg-white !text-[#111827] hover:bg-[#E8F2FC]">I'm a landlord <IconArrowRight class="w-4 h-4" /></a>
           <a href="/properties" class="tx-btn text-white border-white/25 hover:bg-white/10">Find a property</a>
         </div>
       </div>
@@ -92,7 +92,7 @@ template
         </div>
 
         <div id="landlords" class="rounded-[24px] bg-night text-white p-6 sm:p-8 scroll-mt-24">
-          <p class="tx-eyebrow !text-[#C4BAFF] mb-2">For landlords</p>
+          <p class="tx-eyebrow !text-[#93C5FD] mb-2">For landlords</p>
           <h2 class="text-2xl font-bold tracking-tight mb-2">Your building, looked after</h2>
           <p class="text-sm text-white/70 leading-relaxed mb-6">Hand over the day-to-day and get rent on time, without the phone calls.</p>
           <ol class="space-y-4 mb-6">
@@ -111,7 +111,7 @@ template
             <p class="text-sm text-white/80">Your tenants get our online portal to check balances, download receipts and pay rent by M-Pesa.</p>
           </div>
           <div class="flex flex-wrap gap-2">
-            <a href="/contact?topic=landlord" class="tx-btn tx-btn-sm bg-white !text-[#1B183D] hover:bg-lilac">Talk to us <IconArrowRight class="w-4 h-4" /></a>
+            <a href="/contact?topic=landlord" class="tx-btn tx-btn-sm bg-white !text-[#111827] hover:bg-[#E8F2FC]">Talk to us <IconArrowRight class="w-4 h-4" /></a>
 {{#if Site.settings.whatsapp}}
             <a href="{{ Fmt.whatsapp(Site.settings.whatsapp, 'Hello Barani Better Homes, I own a rental property and would like to talk about management.') }}" target="_blank" rel="noopener" class="tx-btn tx-btn-sm text-white border-white/20 hover:bg-white/10"><IconWhatsapp class="w-4 h-4" /> WhatsApp</a>
 {{/if}}

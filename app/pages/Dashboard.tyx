@@ -145,11 +145,11 @@ template
 {{#if tenant.linked}}
           <h2 class="font-semibold mb-1">Your tenancy</h2>
           <p class="text-sm text-white/70 mb-5">Linked to account {{ tenant.accountNumber }} ({{ tenant.name }}).</p>
-          <a href="/tenant" class="tx-btn tx-btn-sm bg-white !text-[#1B183D] hover:bg-lilac">Balance & payments <IconArrowRight class="w-4 h-4" /></a>
+          <a href="/tenant" class="tx-btn tx-btn-sm bg-white !text-[#111827] hover:bg-[#E8F2FC]">Balance & payments <IconArrowRight class="w-4 h-4" /></a>
 {{#else}}
           <h2 class="font-semibold mb-1">Renting through us?</h2>
           <p class="text-sm text-white/70 mb-5">Link your tenancy to see your rent balance and receipts, and pay by M-Pesa.</p>
-          <a href="/tenant" class="tx-btn tx-btn-sm bg-white !text-[#1B183D] hover:bg-lilac">Link my tenancy</a>
+          <a href="/tenant" class="tx-btn tx-btn-sm bg-white !text-[#111827] hover:bg-[#E8F2FC]">Link my tenancy</a>
 {{/if}}
         </section>
       </div>

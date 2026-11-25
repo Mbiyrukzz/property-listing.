@@ -101,7 +101,7 @@ template
 
       <aside class="flex flex-col gap-4">
         <div id="landlords" class="rounded-[22px] bg-night text-white p-5 sm:p-6">
-          <p class="tx-eyebrow !text-[#C4BAFF] mb-2">For landlords</p>
+          <p class="tx-eyebrow !text-[#93C5FD] mb-2">For landlords</p>
           <h2 class="text-xl font-bold tracking-tight mb-2">We'll manage it for you</h2>
           <p class="text-sm text-white/70 leading-relaxed mb-4">Rent collection and full property management, from a single unit to a whole block.</p>
           <ul class="space-y-2.5 mb-5">
@@ -113,7 +113,7 @@ template
 {{/each}}
           </ul>
           <div class="flex flex-wrap gap-2">
-            <button type="button" class="tx-btn tx-btn-sm bg-white !text-[#1B183D] hover:bg-lilac" onclick="{{ askLandlord() }}">Ask about management</button>
+            <button type="button" class="tx-btn tx-btn-sm bg-white !text-[#111827] hover:bg-[#E8F2FC]" onclick="{{ askLandlord() }}">Ask about management</button>
             <a href="/p/about" class="tx-btn tx-btn-sm text-white border-white/20 hover:bg-white/10">About us</a>
           </div>
         </div>
