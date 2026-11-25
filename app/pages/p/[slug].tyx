@@ -59,10 +59,10 @@ template
       <div class="max-w-5xl mx-auto px-4 sm:px-8 py-12 sm:py-16">
         <p class="tx-eyebrow mb-3">About us</p>
         <h1 class="text-[2rem] leading-[1.1] sm:text-5xl font-bold tracking-tight max-w-3xl">{{ page.title }}</h1>
-        <p class="mt-4 text-base sm:text-lg text-white/75 max-w-2xl leading-relaxed">{{ Site.settings.about_short }}</p>
+        <p class="mt-4 text-base sm:text-lg bb-hero-lede max-w-2xl leading-relaxed">{{ Site.settings.about_short }}</p>
         <div class="mt-6 flex flex-wrap gap-2">
-          <a href="/contact?topic=landlord" class="tx-btn bg-white !text-[#111827] hover:bg-[#E8F2FC]">I'm a landlord <IconArrowRight class="w-4 h-4" /></a>
-          <a href="/properties" class="tx-btn text-white border-white/25 hover:bg-white/10">Find a property</a>
+          <a href="/contact?topic=landlord" class="tx-btn bb-frame-cta">I'm a landlord <IconArrowRight class="w-4 h-4" /></a>
+          <a href="/properties" class="tx-btn bb-frame-ghost">Find a property</a>
         </div>
       </div>
     </section>

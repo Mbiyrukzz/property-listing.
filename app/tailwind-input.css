@@ -678,10 +678,13 @@ input[type="checkbox"], input[type="radio"] { accent-color: rgb(var(--tx-brand))
   -webkit-mask-image: radial-gradient(ellipse 70% 70% at 70% 30%, #000 10%, transparent 75%);
           mask-image: radial-gradient(ellipse 70% 70% at 70% 30%, #000 10%, transparent 75%);
 }
-/* Rooftop silhouette along the bottom edge. */
+/* Rooftop silhouette along the bottom edge. The SVG is a mask, so the
+   colour comes from background-color and follows the theme. */
 .bb-hero-skyline {
   position: absolute; left: 0; right: 0; bottom: 0; height: 120px; z-index: -1; pointer-events: none;
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='120' viewBox='0 0 600 120'%3E%3Cg fill='white' fill-opacity='0.04'%3E%3Crect x='0' y='70' width='40' height='50'/%3E%3Cpolygon points='40,120 40,82 62,62 84,82 84,120'/%3E%3Crect x='90' y='40' width='34' height='80'/%3E%3Crect x='128' y='58' width='26' height='62'/%3E%3Crect x='158' y='88' width='50' height='32'/%3E%3Cpolygon points='208,120 208,74 236,52 264,74 264,120'/%3E%3Crect x='270' y='30' width='42' height='90'/%3E%3Crect x='316' y='64' width='30' height='56'/%3E%3Crect x='350' y='92' width='40' height='28'/%3E%3Cpolygon points='392,120 392,84 410,70 428,84 428,120'/%3E%3Crect x='434' y='48' width='36' height='72'/%3E%3Crect x='474' y='76' width='54' height='44'/%3E%3Crect x='532' y='60' width='28' height='60'/%3E%3Crect x='564' y='90' width='36' height='30'/%3E%3C/g%3E%3C/svg%3E") repeat-x bottom left / 600px 120px;
+  background-color: rgb(255 255 255 / 0.04);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='120' viewBox='0 0 600 120'%3E%3Cg fill='black'%3E%3Crect x='0' y='70' width='40' height='50'/%3E%3Cpolygon points='40,120 40,82 62,62 84,82 84,120'/%3E%3Crect x='90' y='40' width='34' height='80'/%3E%3Crect x='128' y='58' width='26' height='62'/%3E%3Crect x='158' y='88' width='50' height='32'/%3E%3Cpolygon points='208,120 208,74 236,52 264,74 264,120'/%3E%3Crect x='270' y='30' width='42' height='90'/%3E%3Crect x='316' y='64' width='30' height='56'/%3E%3Crect x='350' y='92' width='40' height='28'/%3E%3Cpolygon points='392,120 392,84 410,70 428,84 428,120'/%3E%3Crect x='434' y='48' width='36' height='72'/%3E%3Crect x='474' y='76' width='54' height='44'/%3E%3Crect x='532' y='60' width='28' height='60'/%3E%3Crect x='564' y='90' width='36' height='30'/%3E%3C/g%3E%3C/svg%3E") repeat-x bottom left / 600px 120px;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='120' viewBox='0 0 600 120'%3E%3Cg fill='black'%3E%3Crect x='0' y='70' width='40' height='50'/%3E%3Cpolygon points='40,120 40,82 62,62 84,82 84,120'/%3E%3Crect x='90' y='40' width='34' height='80'/%3E%3Crect x='128' y='58' width='26' height='62'/%3E%3Crect x='158' y='88' width='50' height='32'/%3E%3Cpolygon points='208,120 208,74 236,52 264,74 264,120'/%3E%3Crect x='270' y='30' width='42' height='90'/%3E%3Crect x='316' y='64' width='30' height='56'/%3E%3Crect x='350' y='92' width='40' height='28'/%3E%3Cpolygon points='392,120 392,84 410,70 428,84 428,120'/%3E%3Crect x='434' y='48' width='36' height='72'/%3E%3Crect x='474' y='76' width='54' height='44'/%3E%3Crect x='532' y='60' width='28' height='60'/%3E%3Crect x='564' y='90' width='36' height='30'/%3E%3C/g%3E%3C/svg%3E") repeat-x bottom left / 600px 120px;
 }
 .bb-hero-orb {
   position: absolute;
@@ -810,6 +813,65 @@ input[type="checkbox"], input[type="radio"] { accent-color: rgb(var(--tx-brand))
   transition: background-color 0.15s;
 }
 .bb-hero-pill:hover { background: rgb(255 255 255 / 0.14); color: #fff; }
+
+/* Hero pieces that carry their own colours (rather than utilities), so
+   the light theme below can restyle them. */
+.bb-hero-lede { color: rgb(255 255 255 / 0.7); }
+.bb-hero-card { box-shadow: 0 0 0 1px rgb(255 255 255 / 0.1), 0 25px 50px -12px rgb(0 0 0 / 0.3); }
+/* Buttons on the hero and footer: white and outline-on-navy in dark mode,
+   brand and outline-on-light in light mode (below). */
+.tx-btn.bb-frame-cta { color: #111827; background: #fff; }
+.tx-btn.bb-frame-cta:hover { color: #111827; background: #E8F2FC; }
+.tx-btn.bb-frame-ghost { color: #fff; border-color: rgb(255 255 255 / 0.25); }
+.tx-btn.bb-frame-ghost:hover { color: #fff; background: rgb(255 255 255 / 0.1); }
+
+/* ── Light theme hero ────────────────────────────────────────────────
+   Dark mode keeps the navy hero above. In light mode the hero is a soft
+   blue-grey band, a step deeper than the page canvas, so it sits with
+   the rest of the light pages without glaring white. */
+:root:not(.dark) .bb-hero {
+  color: rgb(var(--tx-ink));
+  background: rgb(233 239 247);
+  border-bottom: 1px solid rgb(var(--tx-line));
+}
+:root:not(.dark) .bb-hero-grid {
+  background-image:
+    linear-gradient(rgb(14 99 184 / 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(14 99 184 / 0.06) 1px, transparent 1px);
+}
+:root:not(.dark) .bb-hero-skyline { background-color: rgb(14 99 184 / 0.06); }
+:root:not(.dark) .bb-hero-orb { background: rgb(14 99 184 / 0.06); }
+:root:not(.dark) .bb-hero-kicker {
+  color: rgb(var(--tx-brand));
+  background: rgb(255 255 255 / 0.7);
+  border-color: rgb(var(--tx-brand) / 0.18);
+}
+:root:not(.dark) .bb-hero .tx-eyebrow { color: rgb(var(--tx-brand)); }
+:root:not(.dark) .bb-hero-lede { color: rgb(var(--tx-soft)); }
+:root:not(.dark) .bb-search {
+  box-shadow: 0 0 0 1px rgb(var(--tx-line)), 0 24px 48px -24px rgb(17 24 39 / 0.22);
+}
+:root:not(.dark) .bb-stat { color: rgb(var(--tx-ink)); border-left-color: rgb(var(--tx-line-strong)); }
+:root:not(.dark) .bb-stat-label { color: rgb(var(--tx-muted)); }
+:root:not(.dark) .bb-stat:hover .bb-stat-label { color: rgb(var(--tx-brand)); }
+@media (max-width: 639px) {
+  :root:not(.dark) .bb-stat, :root:not(.dark) .bb-stat:first-child {
+    background: rgb(255 255 255 / 0.65);
+    border-color: rgb(var(--tx-line));
+  }
+}
+:root:not(.dark) .bb-hero-stack-back {
+  background: rgb(14 99 184 / 0.06);
+  border-color: rgb(14 99 184 / 0.14);
+}
+:root:not(.dark) .bb-hero-card {
+  box-shadow: 0 0 0 1px rgb(var(--tx-line)), 0 24px 48px -20px rgb(17 24 39 / 0.2);
+}
+:root:not(.dark) .bb-hero-float { box-shadow: 0 16px 32px -16px rgb(17 24 39 / 0.25); }
+:root:not(.dark) .tx-btn.bb-frame-cta { color: rgb(var(--tx-on-brand)); background: rgb(var(--tx-brand)); }
+:root:not(.dark) .tx-btn.bb-frame-cta:hover { color: rgb(var(--tx-on-brand)); background: rgb(var(--tx-brand-hover)); }
+:root:not(.dark) .tx-btn.bb-frame-ghost { color: rgb(var(--tx-ink)); background: rgb(255 255 255 / 0.6); border-color: rgb(var(--tx-line-strong)); }
+:root:not(.dark) .tx-btn.bb-frame-ghost:hover { color: rgb(var(--tx-ink)); background: rgb(var(--tx-panel)); }
 
 /* Status dots, as in Emergency / Urgent / Routine. */
 .bb-dot { display: inline-block; width: 7px; height: 7px; flex: none; border-radius: 999px; background: rgb(var(--tx-muted)); }
@@ -945,26 +1007,79 @@ input[type="checkbox"], input[type="radio"] { accent-color: rgb(var(--tx-brand))
 .bb-hbar-track { height: 0.5rem; border-radius: 999px; background: rgb(var(--tx-well)); overflow: hidden; }
 .bb-hbar { height: 100%; background: rgb(var(--tx-brand) / 0.75); border-radius: 999px; }
 
-/* Footer on the navy frame. */
+/* Footer. Every colour comes from the --bbf-* variables: navy frame with
+   white text in dark mode, and in light mode the same soft blue-grey as
+   the hero with dark text. */
 .bb-footer {
+  --bbf-bg: rgb(var(--bb-frame));
+  --bbf-fg: rgb(226 228 236);
+  --bbf-strong: #fff;
+  --bbf-link: rgb(255 255 255 / 0.68);
+  --bbf-link-hover: #fff;
+  --bbf-text: rgb(255 255 255 / 0.65);
+  --bbf-text-2: rgb(255 255 255 / 0.75);
+  --bbf-kicker: rgb(255 255 255 / 0.5);
+  --bbf-label: rgb(255 255 255 / 0.45);
+  --bbf-meta: rgb(255 255 255 / 0.55);
+  --bbf-credit: rgb(255 255 255 / 0.8);
+  --bbf-surface: rgb(255 255 255 / 0.04);
+  --bbf-surface-2: rgb(255 255 255 / 0.07);
+  --bbf-border: rgb(255 255 255 / 0.09);
+  --bbf-border-2: rgb(255 255 255 / 0.1);
+  --bbf-icon: rgb(255 255 255 / 0.8);
+  --bbf-icon-bg: rgb(255 255 255 / 0.06);
+  --bbf-wordmark: rgb(255 255 255 / 0.05);
   position: relative; overflow: hidden; isolation: isolate;
-  color: rgb(226 228 236);
-  background: rgb(var(--bb-frame));
+  color: var(--bbf-fg);
+  background: var(--bbf-bg);
 }
-.bb-footer a { color: rgb(255 255 255 / 0.68); text-decoration: none; }
-.bb-footer a:hover { color: #fff; }
-.bb-footer h2 { color: #fff; }
+:root:not(.dark) .bb-footer {
+  --bbf-bg: rgb(233 239 247);
+  --bbf-fg: rgb(var(--tx-soft));
+  --bbf-strong: rgb(var(--tx-ink));
+  --bbf-link: rgb(var(--tx-soft));
+  --bbf-link-hover: rgb(var(--tx-brand));
+  --bbf-text: rgb(var(--tx-soft));
+  --bbf-text-2: rgb(var(--tx-soft));
+  --bbf-kicker: rgb(var(--tx-brand));
+  --bbf-label: rgb(84 96 114);
+  --bbf-meta: rgb(84 96 114);
+  --bbf-credit: rgb(var(--tx-ink));
+  --bbf-surface: rgb(255 255 255 / 0.6);
+  --bbf-surface-2: rgb(255 255 255 / 0.7);
+  --bbf-border: rgb(var(--tx-line-strong));
+  --bbf-border-2: rgb(var(--tx-line-strong));
+  --bbf-icon: rgb(var(--tx-brand));
+  --bbf-icon-bg: rgb(255 255 255 / 0.8);
+  --bbf-wordmark: rgb(14 99 184 / 0.06);
+  border-top: 1px solid rgb(var(--tx-line));
+}
+/* :where() keeps plain footer links at low specificity, so buttons and the
+   named link classes below win without !important. */
+.bb-footer :where(a) { color: var(--bbf-link); text-decoration: none; }
+.bb-footer :where(a):hover { color: var(--bbf-link-hover); }
+.bb-footer h2 { color: var(--bbf-strong); }
+.bb-footer .bb-footer-brand { color: var(--bbf-strong); }
+.bb-footer-kicker { color: var(--bbf-kicker); }
+.bb-footer-text { color: var(--bbf-text); }
+.bb-footer-text-2 { color: var(--bbf-text-2); }
+.bb-footer-label { color: var(--bbf-label); }
+.bb-footer-pill { color: var(--bbf-icon); background: var(--bbf-surface-2); border: 1px solid var(--bbf-border-2); }
+.bb-footer-bar { color: var(--bbf-meta); border-top: 1px solid var(--bbf-border-2); }
+.bb-footer .bb-footer-credit { color: var(--bbf-credit); }
+.bb-footer .bb-footer-credit:hover { color: var(--bbf-link-hover); text-decoration: underline; }
 .bb-footer-cta {
   display: flex; flex-direction: column; gap: 1.5rem;
   padding: 1.5rem;
-  background: rgb(255 255 255 / 0.04);
-  border: 1px solid rgb(255 255 255 / 0.09);
+  background: var(--bbf-surface);
+  border: 1px solid var(--bbf-border);
   border-radius: 24px;
 }
 @media (min-width: 1024px) {
   .bb-footer-cta { flex-direction: row; align-items: center; justify-content: space-between; padding: 2rem 2.25rem; }
 }
 .bb-footer-heading { margin-bottom: 1rem; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+:root:not(.dark) .bb-footer .bb-footer-heading { color: rgb(var(--tx-ink)); }
 .bb-footer .bb-footer-link {
   display: inline-flex; align-items: center; gap: 0.35rem;
   font-size: 0.875rem; transition: color 0.15s, transform 0.15s;
@@ -973,9 +1088,9 @@ input[type="checkbox"], input[type="radio"] { accent-color: rgb(var(--tx-brand))
 .bb-footer-contact { display: flex; align-items: center; gap: 0.75rem; }
 .bb-footer-icon {
   display: grid; place-items: center; flex: none; width: 2.25rem; height: 2.25rem;
-  color: rgb(255 255 255 / 0.8);
-  background: rgb(255 255 255 / 0.06);
-  border: 1px solid rgb(255 255 255 / 0.09);
+  color: var(--bbf-icon);
+  background: var(--bbf-icon-bg);
+  border: 1px solid var(--bbf-border);
   border-radius: 11px;
   transition: background-color 0.15s, color 0.15s;
 }
@@ -983,17 +1098,18 @@ input[type="checkbox"], input[type="radio"] { accent-color: rgb(var(--tx-brand))
 .bb-footer .bb-tylix {
   display: inline-flex; align-items: center; gap: 0.45rem;
   padding: 0.3rem 0.7rem 0.3rem 0.5rem;
-  font-weight: 700; color: rgb(var(--tx-ink));
+  font-weight: 700; color: rgb(17 24 39);
   background: #fff; border-radius: 999px;
   transition: transform 0.15s, box-shadow 0.15s;
 }
-.bb-footer .bb-tylix:hover { color: rgb(var(--tx-ink)); transform: translateY(-1px); box-shadow: 0 6px 16px -8px rgb(0 0 0 / 0.6); }
+.bb-footer .bb-tylix:hover { color: rgb(17 24 39); transform: translateY(-1px); box-shadow: 0 6px 16px -8px rgb(0 0 0 / 0.6); }
+:root:not(.dark) .bb-footer .bb-tylix { box-shadow: 0 0 0 1px rgb(var(--tx-line-strong)); }
+:root:not(.dark) .bb-footer .bb-tylix:hover { box-shadow: 0 0 0 1px rgb(var(--tx-line-strong)), 0 6px 16px -8px rgb(17 24 39 / 0.3); }
 .bb-tylix img { width: 1.15rem; height: auto; display: block; }
-.dark .bb-footer .bb-tylix, .dark .bb-footer .bb-tylix:hover { color: rgb(17 24 39); }
 .bb-footer-wordmark {
   margin: 0; padding: 0 1rem; text-align: center; white-space: nowrap; overflow: hidden;
   font-size: clamp(2.25rem, 8.2vw, 7.5rem); font-weight: 800; line-height: 0.9; letter-spacing: -0.05em;
-  color: rgb(255 255 255 / 0.05);
+  color: var(--bbf-wordmark);
   user-select: none; pointer-events: none;
   margin-bottom: -0.12em;
 }

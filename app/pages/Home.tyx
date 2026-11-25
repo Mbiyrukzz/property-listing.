@@ -85,7 +85,7 @@ template
         <div class="min-w-0">
           <p class="bb-hero-kicker"><IconSparkles class="w-3.5 h-3.5" /> {{ Site.settings.tagline }}</p>
           <h1 class="mt-5 text-[2.3rem] leading-[1.04] sm:text-[3.4rem] lg:text-[4.1rem] font-extrabold tracking-[-0.035em] max-w-3xl">{{ Site.settings.hero_title }}</h1>
-          <p class="mt-5 text-base sm:text-lg text-white/70 max-w-xl leading-relaxed">{{ Site.settings.hero_subtitle }}</p>
+          <p class="mt-5 text-base sm:text-lg bb-hero-lede max-w-xl leading-relaxed">{{ Site.settings.hero_subtitle }}</p>
 
           <form onsubmit.prevent="{{ search() }}" class="bb-search mt-8" role="search" aria-label="Find a property">
             <div class="flex items-center justify-between gap-3 mb-3 px-1">
@@ -127,7 +127,7 @@ template
         <aside class="hidden lg:block" aria-label="Vacant today">
           <div class="bb-hero-stack">
             <span class="bb-hero-stack-back" aria-hidden="true"></span>
-            <div class="relative bg-panel text-ink rounded-[26px] p-5 shadow-2xl shadow-black/30 ring-1 ring-white/10">
+            <div class="relative bg-panel text-ink rounded-[26px] p-5 bb-hero-card">
               <div class="flex items-center justify-between mb-4">
                 <div class="flex items-center gap-3">
                   <span class="bb-icon-tile bb-icon-tile-sm bb-tint-leaf"><IconKey /></span>
