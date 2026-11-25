@@ -1,0 +1,69 @@
+page ViewingHistory
+
+import AccountNav from "../components/AccountNav"
+import ListingCard from "../components/ListingCard"
+
+title "Recently viewed | Barani Better Homes"
+
+needs
+  Auth
+
+uses
+  Fmt
+
+state
+  items: []
+  loading: true
+
+action
+  async clear() {
+    if not confirm("Clear your viewing history?") {
+      return null
+    }
+    const result = await useApi("/api/account/history", { method: "DELETE" })
+    if result.ok {
+      this.items = []
+    }
+  }
+
+onMount
+  async {
+    if not Auth.user {
+      window.location.href = "/login?next=/account/history"
+      return null
+    }
+    const result = await useApi("/api/account/history")
+    if result.ok {
+      this.items = result.data.data
+    }
+    this.loading = false
+  }
+
+template
+{{#if Auth.user}}
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-5 sm:py-8 grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-4 lg:gap-8">
+    <AccountNav current="history" />
+    <div class="min-w-0">
+      <div class="flex items-center justify-between gap-4 mb-6">
+        <h1 class="text-2xl font-bold tracking-tight">Recently viewed</h1>
+{{#if items.length > 0}}
+        <button class="tx-btn tx-btn-ghost tx-btn-sm" onclick="{{ clear() }}">Clear history</button>
+{{/if}}
+      </div>
+{{#if loading}}
+      <p class="text-sm text-muted">Loading…</p>
+{{#else if items.length is 0}}
+      <p class="text-sm text-muted">Listings you open while signed in show up here.</p>
+{{#else}}
+      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+{{#each l in items}}
+        <div>
+          <ListingCard listing="{{ l }}" />
+          <p class="text-xs text-muted mt-1.5">Viewed {{ Fmt.ago(l.viewedAt) }}{{ l.isPublished ? "" : " · no longer listed" }}</p>
+        </div>
+{{/each}}
+      </div>
+{{/if}}
+    </div>
+  </div>
+{{/if}}

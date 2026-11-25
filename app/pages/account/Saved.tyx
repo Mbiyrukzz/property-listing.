@@ -1,0 +1,66 @@
+page SavedProperties
+
+import AccountNav from "../components/AccountNav"
+import ListingCard from "../components/ListingCard"
+import { IconHeart } from "tylix-icons"
+
+title "Saved properties | Barani Better Homes"
+
+needs
+  Auth
+
+uses
+  Saved
+
+state
+  items: []
+  loading: true
+
+computed
+  // Unsaving from a card removes it here too, without reloading.
+  visible() {
+    return this.items.filter(l => Saved.has(l.id))
+  }
+
+onMount
+  async {
+    if not Auth.user {
+      window.location.href = "/login?next=/account/saved"
+      return null
+    }
+    const result = await useApi("/api/account/saved")
+    if result.ok {
+      this.items = result.data.data
+    }
+    this.loading = false
+  }
+
+template
+{{#if Auth.user}}
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-5 sm:py-8 grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-4 lg:gap-8">
+    <AccountNav current="saved" />
+    <div class="min-w-0">
+      <h1 class="text-2xl font-bold tracking-tight mb-6">Saved properties</h1>
+{{#if loading}}
+      <p class="text-sm text-muted">Loading…</p>
+{{#else if visible.length is 0}}
+      <div class="rounded-xl border border-dashed border-line-strong p-10 text-center">
+        <IconHeart class="w-8 h-8 text-muted mx-auto mb-3" />
+        <p class="text-sm text-muted mb-4">Tap the heart on any listing to keep it here.</p>
+        <a href="/properties" class="tx-btn tx-btn-primary tx-btn-sm">Browse properties</a>
+      </div>
+{{#else}}
+      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+{{#each l in visible}}
+        <div class="relative">
+          <ListingCard listing="{{ l }}" />
+{{#if not l.isPublished}}
+          <p class="absolute inset-x-3 bottom-3 bb-chip bb-chip-bad justify-center">No longer listed</p>
+{{/if}}
+        </div>
+{{/each}}
+      </div>
+{{/if}}
+    </div>
+  </div>
+{{/if}}

@@ -1,0 +1,285 @@
+page ApplyForProperty
+
+import { IconArrowLeft, IconCheckCircle, IconLockClosed } from "tylix-icons"
+
+title "Apply"
+
+props
+  slug: string
+
+needs
+  Auth
+
+uses
+  Fmt
+  Site
+
+state
+  listing: null
+  loading: true
+  isMissing: false
+  unitId: ""
+  fullName: ""
+  email: ""
+  phone: ""
+  idNumber: ""
+  occupation: ""
+  employer: ""
+  monthlyIncome: ""
+  offerAmount: ""
+  financing: "cash"
+  moveInDate: ""
+  occupants: 1
+  notes: ""
+  agree: false
+  errors: {}
+  formError: ""
+  sending: false
+  submitted: false
+  today: ""
+
+computed
+  isPurchase() {
+    return this.listing and this.listing.purpose is "sale"
+  }
+
+  needsUnit() {
+    return this.listing and this.listing.fromProperman and not this.isPurchase
+  }
+
+  selectedUnit() {
+    if not this.listing {
+      return null
+    }
+    return this.listing.units.find(u => String(u.id) is String(this.unitId)) ?? null
+  }
+
+action
+  fieldError(field) {
+    const list = this.errors[field]
+    return Array.isArray(list) and list.length > 0 ? list[0] : ""
+  }
+
+  num(value) {
+    return value is "" or value is null ? null : Number(value)
+  }
+
+  async submit() {
+    if this.sending {
+      return null
+    }
+    this.errors = {}
+    this.formError = ""
+    if not this.agree {
+      this.formError = "Please confirm that the details are correct."
+      return null
+    }
+    if this.needsUnit and not this.unitId {
+      this.errors = { unit_id: ["Pick the unit you're applying for."] }
+      return null
+    }
+
+    this.sending = true
+    const result = await useApi("/api/account/applications", {
+      method: "POST",
+      body: {
+        kind: this.isPurchase ? "purchase" : "rental",
+        property_id: this.listing.id,
+        unit_id: this.unitId ? Number(this.unitId) : null,
+        full_name: this.fullName,
+        email: this.email,
+        phone: this.phone,
+        id_number: this.idNumber,
+        occupation: this.occupation,
+        employer: this.employer,
+        monthly_income: this.num(this.monthlyIncome),
+        offer_amount: this.isPurchase ? this.num(this.offerAmount) : null,
+        financing: this.isPurchase ? this.financing : null,
+        move_in_date: this.moveInDate or null,
+        occupants: this.isPurchase ? null : this.num(this.occupants),
+        notes: this.notes
+      }
+    })
+    this.sending = false
+
+    if result.ok {
+      this.submitted = true
+      window.scrollTo({ top: 0 })
+      return null
+    }
+    if result.status is 422 and result.data?.errors {
+      this.errors = result.data.errors
+      this.formError = "Check the highlighted fields."
+      return null
+    }
+    this.formError = Fmt.firstError(result, "Your application couldn't be sent. Try again.")
+  }
+
+onMount
+  async {
+    if not Auth.user {
+      window.location.href = "/login?next=" + encodeURIComponent(window.location.pathname + window.location.search)
+      return null
+    }
+    this.today = new Date().toISOString().slice(0, 10)
+    this.fullName = Auth.user.name ?? ""
+    this.email = Auth.user.email ?? ""
+    const profile = await useApi("/api/account/profile")
+    if profile.ok {
+      this.phone = profile.data.data.phone ?? ""
+    }
+
+    const result = await useApi(`/api/listings/${encodeURIComponent(this.slug)}`)
+    if result.ok {
+      this.listing = result.data.data
+      document.title = "Apply: " + this.listing.title
+      const wanted = new URLSearchParams(window.location.search).get("unit")
+      if wanted and this.listing.units.some(u => String(u.id) is wanted) {
+        this.unitId = wanted
+      } else if this.listing.units.length is 1 {
+        this.unitId = String(this.listing.units[0].id)
+      }
+      if this.isPurchase {
+        this.offerAmount = this.listing.price or ""
+      }
+    } else {
+      this.isMissing = true
+    }
+    this.loading = false
+  }
+
+template
+  <div class="max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+{{#if loading}}
+    <div class="bb-card h-96 animate-pulse" data-page-loader="true"></div>
+{{#else if isMissing}}
+    <div class="text-center py-16">
+      <h1 class="text-2xl font-semibold mb-2">This listing isn't available any more</h1>
+      <a href="/properties" class="tx-btn tx-btn-primary mt-4">Browse properties</a>
+    </div>
+{{#else if submitted}}
+    <div class="tx-panel p-8 text-center">
+      <IconCheckCircle class="w-12 h-12 text-mint mx-auto mb-4" />
+      <h1 class="text-2xl font-semibold mb-2">Application sent</h1>
+      <p class="text-muted mb-6">We'll review it and call you on {{ phone }}. You can follow its progress from your account.</p>
+      <div class="flex flex-wrap justify-center gap-3">
+        <a href="/account/activity" class="tx-btn tx-btn-primary">Track my application</a>
+        <a href="{{ `/properties/${slug}` }}" class="tx-btn tx-btn-outline">Back to the listing</a>
+      </div>
+    </div>
+{{#else}}
+    <a href="{{ `/properties/${slug}` }}" class="inline-flex items-center gap-1.5 text-sm text-muted hover:text-ink mb-4"><IconArrowLeft class="w-4 h-4" /> {{ listing.title }}</a>
+    <h1 class="text-[1.75rem] leading-tight sm:text-3xl font-bold tracking-tight">{{ isPurchase ? "Make an offer" : "Rental application" }}</h1>
+    <p class="text-muted mt-2 mb-6">{{ listing.title }} · {{ listing.location }}</p>
+
+    <form onsubmit.prevent="{{ submit() }}" novalidate class="tx-panel p-5 sm:p-6">
+{{#if formError}}
+      <div role="alert" class="tx-alert tx-alert-error mb-5"><p class="text-sm">{{ formError }}</p></div>
+{{/if}}
+
+{{#if needsUnit}}
+      <fieldset class="mb-6">
+        <legend class="font-semibold mb-3">Unit</legend>
+{{#if listing.units.length is 0}}
+        <p class="text-sm text-muted">Every unit is let right now. <a class="tx-link" href="{{ `/properties/${slug}` }}">Send an enquiry</a> instead and we'll tell you when one frees up.</p>
+{{#else}}
+        <div class="grid gap-2">
+{{#each u in listing.units}}
+          <label class="{{ 'flex items-center justify-between gap-3 p-3 rounded-lg border cursor-pointer ' + (String(u.id) is String(unitId) ? 'border-brand bg-brand/5' : 'border-line') }}">
+            <span class="flex items-center gap-3">
+              <input type="radio" name="unit" value="{{ String(u.id) }}" bind:group="{{ unitId }}" />
+              <span><span class="font-medium">{{ u.name }}</span> <span class="text-sm text-muted">· {{ u.type }}</span></span>
+            </span>
+            <span class="text-sm font-medium whitespace-nowrap">{{ Fmt.price(u.rent, "rent") }}</span>
+          </label>
+{{/each}}
+        </div>
+{{#if fieldError("unit_id")}}<p class="text-xs text-coral mt-2">{{ fieldError("unit_id") }}</p>{{/if}}
+{{/if}}
+      </fieldset>
+{{/if}}
+
+      <fieldset>
+        <legend class="font-semibold mb-3">About you</legend>
+        <div class="grid sm:grid-cols-2 gap-x-4">
+          <div>
+            <label class="tx-label" for="ap-name">Full name</label>
+            <input id="ap-name" class="tx-input" autocomplete="name" bind:value="{{ fullName }}" aria-invalid="{{ fieldError('name') ? 'true' : 'false' }}" />
+{{#if fieldError("name")}}<p class="text-xs text-coral -mt-3 mb-3">{{ fieldError("name") }}</p>{{/if}}
+          </div>
+          <div>
+            <label class="tx-label" for="ap-id">ID or passport number</label>
+            <input id="ap-id" class="tx-input" bind:value="{{ idNumber }}" aria-invalid="{{ fieldError('id_number') ? 'true' : 'false' }}" />
+{{#if fieldError("id_number")}}<p class="text-xs text-coral -mt-3 mb-3">{{ fieldError("id_number") }}</p>{{/if}}
+          </div>
+          <div>
+            <label class="tx-label" for="ap-phone">Phone</label>
+            <input id="ap-phone" class="tx-input" type="tel" autocomplete="tel" placeholder="0712 345 678" bind:value="{{ phone }}" aria-invalid="{{ fieldError('phone') ? 'true' : 'false' }}" />
+{{#if fieldError("phone")}}<p class="text-xs text-coral -mt-3 mb-3">{{ fieldError("phone") }}</p>{{/if}}
+          </div>
+          <div>
+            <label class="tx-label" for="ap-email">Email</label>
+            <input id="ap-email" class="tx-input" type="email" autocomplete="email" bind:value="{{ email }}" aria-invalid="{{ fieldError('email') ? 'true' : 'false' }}" />
+{{#if fieldError("email")}}<p class="text-xs text-coral -mt-3 mb-3">{{ fieldError("email") }}</p>{{/if}}
+          </div>
+          <div>
+            <label class="tx-label" for="ap-occupation">Occupation <span class="text-muted font-normal">(optional)</span></label>
+            <input id="ap-occupation" class="tx-input" bind:value="{{ occupation }}" />
+          </div>
+          <div>
+            <label class="tx-label" for="ap-employer">Employer or business <span class="text-muted font-normal">(optional)</span></label>
+            <input id="ap-employer" class="tx-input" bind:value="{{ employer }}" />
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset class="mt-2">
+        <legend class="font-semibold mb-3">{{ isPurchase ? "Your offer" : "Your tenancy" }}</legend>
+        <div class="grid sm:grid-cols-2 gap-x-4">
+{{#if isPurchase}}
+          <div>
+            <label class="tx-label" for="ap-offer">Offer (KES)</label>
+            <input id="ap-offer" class="tx-input" type="number" min="1" step="1000" inputmode="numeric" bind:value="{{ offerAmount }}" aria-invalid="{{ fieldError('offer_amount') ? 'true' : 'false' }}" />
+{{#if fieldError("offer_amount")}}<p class="text-xs text-coral -mt-3 mb-3">{{ fieldError("offer_amount") }}</p>{{/if}}
+            <p class="text-xs text-muted -mt-3 mb-4">Asking price: {{ Fmt.price(listing.price, "sale") }}</p>
+          </div>
+          <div>
+            <label class="tx-label" for="ap-financing">How will you pay?</label>
+            <select id="ap-financing" class="tx-input" bind:value="{{ financing }}">
+              <option value="cash">Cash</option>
+              <option value="mortgage">Mortgage</option>
+              <option value="sacco">SACCO loan</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+{{#else}}
+          <div>
+            <label class="tx-label" for="ap-move">Move-in date</label>
+            <input id="ap-move" class="tx-input" type="date" min="{{ today }}" bind:value="{{ moveInDate }}" aria-invalid="{{ fieldError('move_in_date') ? 'true' : 'false' }}" />
+{{#if fieldError("move_in_date")}}<p class="text-xs text-coral -mt-3 mb-3">{{ fieldError("move_in_date") }}</p>{{/if}}
+          </div>
+          <div>
+            <label class="tx-label" for="ap-occupants">People who will live there</label>
+            <input id="ap-occupants" class="tx-input" type="number" min="1" max="30" bind:value="{{ occupants }}" />
+          </div>
+          <div>
+            <label class="tx-label" for="ap-income">Monthly income (KES) <span class="text-muted font-normal">(optional)</span></label>
+            <input id="ap-income" class="tx-input" type="number" min="0" step="1000" inputmode="numeric" bind:value="{{ monthlyIncome }}" />
+{{#if selectedUnit}}<p class="text-xs text-muted -mt-3 mb-4">Rent for {{ selectedUnit.name }}: {{ Fmt.price(selectedUnit.rent, "rent") }}</p>{{/if}}
+          </div>
+{{/if}}
+        </div>
+        <label class="tx-label" for="ap-notes">Anything else? <span class="text-muted font-normal">(optional)</span></label>
+        <textarea id="ap-notes" class="tx-input" rows="3" bind:value="{{ notes }}"></textarea>
+      </fieldset>
+
+      <label class="flex items-start gap-2 text-sm text-soft mb-5">
+        <input type="checkbox" class="mt-1" bind:checked="{{ agree }}" />
+        <span>The details above are correct, and Barani Better Homes may share them with the landlord or seller to review this application. See our <a class="tx-link" href="/p/privacy">privacy note</a>.</span>
+      </label>
+
+      <button type="submit" class="tx-btn tx-btn-primary" disabled="{{ sending or (needsUnit and listing.units.length is 0) }}">{{ sending ? "Sending…" : "Send application" }}</button>
+      <p class="text-xs text-muted mt-3 flex items-center gap-1.5"><IconLockClosed class="w-3.5 h-3.5" /> An application isn't a tenancy or sale agreement. Nothing is charged here.</p>
+    </form>
+{{/if}}
+  </div>

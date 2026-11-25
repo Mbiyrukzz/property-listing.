@@ -1,0 +1,8 @@
+page Commercial
+
+import ListingBrowser from "./components/ListingBrowser"
+
+title "Offices, shops and commercial property | Barani Better Homes"
+
+template
+  <ListingBrowser heading="Commercial property" intro="Offices, shops and whole commercial buildings to let or buy." fixedPurpose="" fixedGroup="commercial" />

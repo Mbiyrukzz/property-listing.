@@ -1,0 +1,34 @@
+component AccountNav
+
+import { IconLayoutGrid, IconHeart, IconClipboardList, IconEye, IconUserCircle, IconKey, IconLogout } from "tylix-icons"
+
+props
+  current: string
+
+uses
+  Auth
+
+state
+  items: [
+    { key: "overview", label: "Overview", href: "/dashboard" },
+    { key: "saved", label: "Saved properties", href: "/account/saved" },
+    { key: "activity", label: "Enquiries & applications", href: "/account/activity" },
+    { key: "history", label: "Recently viewed", href: "/account/history" },
+    { key: "tenant", label: "Tenant portal", href: "/tenant" },
+    { key: "profile", label: "Profile", href: "/account/profile" }
+  ]
+
+template
+  <nav aria-label="Your account" class="bb-sidenav">
+    <p class="bb-sidenav-title">Your account</p>
+{{#each item in items}}
+    <a href="{{ item.href }}" class="bb-side-link" aria-current="{{ item.key is current ? 'page' : 'false' }}">
+{{#if item.key is "overview"}}<IconLayoutGrid class="w-4 h-4" />{{#else if item.key is "saved"}}<IconHeart class="w-4 h-4" />{{#else if item.key is "activity"}}<IconClipboardList class="w-4 h-4" />{{#else if item.key is "history"}}<IconEye class="w-4 h-4" />{{#else if item.key is "tenant"}}<IconKey class="w-4 h-4" />{{#else}}<IconUserCircle class="w-4 h-4" />{{/if}}
+      {{ item.label }}
+    </a>
+{{/each}}
+    <button class="bb-side-link text-left" onclick="{{ Auth.logout() }}"><IconLogout class="w-4 h-4" /> Log out</button>
+    <div class="bb-sidenav-foot">
+      Need a hand? <a href="/contact" class="font-semibold !text-white hover:underline">Talk to an agent →</a>
+    </div>
+  </nav>

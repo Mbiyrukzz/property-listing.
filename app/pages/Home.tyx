@@ -1,25 +1,318 @@
 page Home
 
-import Hero from "./components/Hero"
-import InstallSnippet from "./components/InstallSnippet"
-import Stats from "./components/Stats"
-import FeatureGrid from "./components/FeatureGrid"
-import HowItWorks from "./components/HowItWorks"
+import ListingCard from "./components/ListingCard"
 import LatestPosts from "./components/LatestPosts"
-import CTASection from "./components/CTASection"
+import { IconSearch, IconArrowRight, IconBuildingOffice, IconHome, IconStore, IconTree, IconKey, IconRefresh, IconMobileMoney, IconMapPin, IconBed, IconCalendarCheck, IconSparkles, IconCheck, IconWhatsapp } from "tylix-icons"
 
-title "Tylix"
+title "Barani Better Homes: homes, land and commercial property in Kenya"
 
 uses
   Auth
+  Site
+  Fmt
+
+state
+  purpose: "rent"
+  q: ""
+  category: ""
+  featured: []
+  recent: []
+  vacantUnits: []
+  vacantTotal: 0
+  counts: {}
+  purposeCounts: { rent: 0, sale: 0 }
+  loading: true
+  loadError: ""
+  tiles: [
+    { key: "apartment", label: "Apartments", href: "/properties?category=apartment", tint: "lilac" },
+    { key: "house", label: "Houses", href: "/properties?category=house", tint: "blush" },
+    { key: "maisonette", label: "Maisonettes", href: "/properties?category=maisonette", tint: "apricot" },
+    { key: "furnished", label: "Furnished", href: "/properties?category=furnished", tint: "butter" },
+    { key: "office", label: "Offices", href: "/properties?category=office", tint: "lilac" },
+    { key: "shop", label: "Shops", href: "/properties?category=shop", tint: "blush" },
+    { key: "commercial", label: "Commercial buildings", href: "/properties?category=commercial", tint: "apricot" },
+    { key: "land", label: "Land & plots", href: "/land", tint: "leaf" }
+  ]
+
+computed
+  heroUnits() {
+    return this.vacantUnits.slice(0, 3)
+  }
+
+action
+  search() {
+    const params = new URLSearchParams()
+    params.set("purpose", this.purpose)
+    if this.q.trim() {
+      params.set("q", this.q.trim())
+    }
+    if this.category {
+      params.set("category", this.category)
+    }
+    window.location.href = "/properties?" + params.toString()
+  }
+
+  count(key) {
+    return this.counts[key] ?? 0
+  }
+
+  segClass(value) {
+    return this.purpose is value ? "is-on" : ""
+  }
+
+onMount
+  async {
+    const result = await useApi("/api/listings/home")
+    if result.ok {
+      this.featured = result.data.featured
+      this.recent = result.data.recent
+      this.vacantUnits = result.data.vacantUnits
+      this.vacantTotal = result.data.vacantTotal
+      this.counts = result.data.counts
+      this.purposeCounts = result.data.purposeCounts
+    } else {
+      this.loadError = "Listings couldn't be loaded just now. Refresh to try again."
+    }
+    this.loading = false
+  }
 
 template
   <div>
-    <Hero loggedIn="{{ Auth.user }}" hasAuth="{{ true }}" hasPosts="{{ true }}" />
-    <Stats />
-    <FeatureGrid />
-    <InstallSnippet />
-    <HowItWorks />
+    <section class="bb-hero">
+      <span class="bb-hero-orb w-[34rem] h-[34rem] -right-48 -top-56" aria-hidden="true"></span>
+      <span class="bb-hero-orb w-40 h-40 -left-16 bottom-10 opacity-60" aria-hidden="true"></span>
+      <div class="max-w-7xl mx-auto px-4 sm:px-8 pt-10 pb-12 sm:pt-16 sm:pb-16 lg:py-20 grid lg:grid-cols-[1.25fr_1fr] gap-10 lg:gap-14 items-center">
+        <div class="min-w-0">
+          <p class="tx-eyebrow mb-4">{{ Site.settings.tagline }}</p>
+          <h1 class="text-[2rem] leading-[1.1] sm:text-5xl lg:text-[3.4rem] font-bold tracking-tight max-w-3xl">{{ Site.settings.hero_title }}</h1>
+          <p class="mt-4 text-base sm:text-lg text-white/75 max-w-xl leading-relaxed">{{ Site.settings.hero_subtitle }}</p>
+
+          <form onsubmit.prevent="{{ search() }}" class="mt-8 bg-panel text-ink rounded-3xl p-3 sm:p-4 shadow-2xl shadow-black/20" role="search" aria-label="Find a property">
+            <div class="flex items-center justify-between gap-3 mb-3">
+              <div class="bb-seg" role="radiogroup" aria-label="Rent or buy">
+                <label class="{{ segClass('rent') }}"><input type="radio" class="sr-only" value="rent" bind:group="{{ purpose }}" /> Rent</label>
+                <label class="{{ segClass('sale') }}"><input type="radio" class="sr-only" value="sale" bind:group="{{ purpose }}" /> Buy</label>
+              </div>
+              <a href="/vacant-units" class="hidden sm:inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-ink"><span class="bb-dot bb-dot-ok"></span> {{ vacantTotal }} vacant today</a>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-[1fr_190px_auto] gap-2">
+              <label class="sr-only" for="hero-q">Area, estate or keyword</label>
+              <div class="relative">
+                <IconMapPin class="w-4 h-4 text-muted absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input id="hero-q" class="tx-input !mb-0 !pl-10" placeholder="Area or estate, e.g. Nyali, Kilimani" bind:value="{{ q }}" />
+              </div>
+              <label class="sr-only" for="hero-category">Property type</label>
+              <select id="hero-category" class="tx-input !mb-0" bind:value="{{ category }}">
+                <option value="">Any type</option>
+{{#each c in Site.categories}}
+                <option value="{{ c.key }}">{{ c.label }}</option>
+{{/each}}
+              </select>
+              <button type="submit" class="tx-btn tx-btn-primary !rounded-[11px] px-6"><IconSearch class="w-4 h-4" /> Search</button>
+            </div>
+          </form>
+
+          <div class="mt-5 flex flex-wrap gap-2">
+            <a href="/vacant-units" class="bb-hero-pill sm:hidden"><span class="bb-dot bb-dot-ok"></span> {{ vacantTotal }} vacant today</a>
+            <a href="/rent" class="bb-hero-pill">{{ purposeCounts.rent }} to let</a>
+            <a href="/buy" class="bb-hero-pill">{{ purposeCounts.sale }} for sale</a>
+            <a href="/land" class="bb-hero-pill">{{ count("land") }} {{ count("land") is 1 ? "plot" : "plots" }}</a>
+          </div>
+        </div>
+
+        <aside class="hidden lg:block" aria-label="Vacant today">
+          <div class="bg-panel text-ink rounded-3xl p-5 shadow-2xl shadow-black/25">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <p class="font-semibold">Vacant today</p>
+                <p class="text-xs text-muted">Straight from the landlord's records</p>
+              </div>
+              <span class="bb-icon-tile bb-icon-tile-sm bb-tint-leaf"><IconKey /></span>
+            </div>
+{{#if loading}}
+            <div class="space-y-2"><div class="h-16 rounded-2xl bg-well animate-pulse"></div><div class="h-16 rounded-2xl bg-well animate-pulse"></div><div class="h-16 rounded-2xl bg-well animate-pulse"></div></div>
+{{#else if vacantUnits.length is 0}}
+            <p class="text-sm text-muted rounded-2xl bg-raised p-4">Every unit is let right now. New vacancies appear here the day they open up.</p>
+{{#else}}
+            <ul class="space-y-2">
+{{#each u in heroUnits}}
+              <li>
+                <a href="{{ `/properties/${u.listing.slug}` }}" class="flex items-center gap-3 rounded-2xl border border-line p-3 hover:border-brand/40 hover:bg-raised transition-colors">
+                  <span class="bb-icon-tile bb-icon-tile-sm bb-tint-lilac"><IconHome /></span>
+                  <span class="min-w-0 flex-1">
+                    <span class="block text-sm font-semibold truncate">{{ u.listing.title }} · {{ u.name }}</span>
+                    <span class="block text-xs text-muted truncate">{{ u.type }} · {{ u.listing.location }}</span>
+                  </span>
+                  <span class="text-sm font-bold whitespace-nowrap">{{ Fmt.price(u.rent, "rent") }}</span>
+                </a>
+              </li>
+{{/each}}
+            </ul>
+{{/if}}
+            <div class="mt-4 rounded-2xl bg-lilac p-4">
+              <p class="tx-eyebrow mb-2.5">How it works</p>
+              <ol class="space-y-2 text-sm text-soft">
+                <li class="flex items-center gap-2.5"><span class="bb-step !w-6 !h-6 !text-[11px]">1</span> Pick a unit and a day to view</li>
+                <li class="flex items-center gap-2.5"><span class="bb-step !w-6 !h-6 !text-[11px]">2</span> An agent calls to confirm</li>
+                <li class="flex items-center gap-2.5"><span class="bb-step !w-6 !h-6 !text-[11px]">3</span> Apply online when it's the one</li>
+              </ol>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 pt-12 sm:pt-16">
+      <div class="flex items-end justify-between mb-5 gap-4">
+        <div>
+          <p class="tx-eyebrow mb-2">Browse</p>
+          <h2 class="text-2xl sm:text-[1.75rem] font-bold tracking-tight">What are you looking for?</h2>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3">
+{{#each tile in tiles}}
+        <a href="{{ tile.href }}" class="group tx-panel !shadow-none p-3 sm:p-4 flex items-center gap-3">
+          <span class="{{ 'bb-icon-tile bb-tint-' + tile.tint }}">
+{{#if tile.key is "land"}}<IconTree />{{#else if tile.key is "office" or tile.key is "commercial"}}<IconBuildingOffice />{{#else if tile.key is "shop"}}<IconStore />{{#else}}<IconHome />{{/if}}
+          </span>
+          <span class="min-w-0 flex-1">
+            <span class="block text-sm font-semibold truncate">{{ tile.label }}</span>
+            <span class="block text-xs text-muted">{{ count(tile.key) }} listed</span>
+          </span>
+          <IconArrowRight class="hidden sm:block w-4 h-4 text-muted opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition" />
+        </a>
+{{/each}}
+      </div>
+    </section>
+
+{{#if loadError}}
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 mt-8"><div class="tx-alert tx-alert-error"><p class="text-sm">{{ loadError }}</p></div></div>
+{{/if}}
+
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 pt-14 sm:pt-16">
+      <div class="flex items-end justify-between mb-5 gap-4">
+        <div>
+          <p class="tx-eyebrow mb-2">Hand-picked</p>
+          <h2 class="text-2xl sm:text-[1.75rem] font-bold tracking-tight">Featured properties</h2>
+        </div>
+        <a href="/properties" class="tx-btn tx-btn-outline tx-btn-sm shrink-0">See all <IconArrowRight class="w-4 h-4" /></a>
+      </div>
+{{#if loading}}
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+        <div class="bb-card h-80 animate-pulse"></div><div class="bb-card h-80 animate-pulse hidden sm:block"></div><div class="bb-card h-80 animate-pulse hidden lg:block"></div>
+      </div>
+{{#else if featured.length is 0}}
+      <p class="text-sm text-muted">New listings are on their way. Check back soon.</p>
+{{#else}}
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+{{#each l in featured}}
+        <ListingCard listing="{{ l }}" />
+{{/each}}
+      </div>
+{{/if}}
+    </section>
+
+{{#if vacantUnits.length > 0}}
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 pt-14 sm:pt-16">
+      <div class="bb-sand rounded-[28px] p-5 sm:p-8">
+        <div class="flex flex-col sm:flex-row sm:items-end justify-between mb-6 gap-4">
+          <div>
+            <p class="tx-eyebrow mb-2">Live availability</p>
+            <h2 class="text-2xl sm:text-[1.75rem] font-bold tracking-tight">Vacant right now</h2>
+            <p class="text-sm text-soft mt-1 max-w-xl">These units are empty today. When a tenant moves in, they leave this list on their own.</p>
+          </div>
+          <a href="/vacant-units" class="tx-btn tx-btn-dark tx-btn-sm self-start sm:self-auto shrink-0">All {{ vacantTotal }} vacant <IconArrowRight class="w-4 h-4" /></a>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+{{#each u in vacantUnits}}
+          <a href="{{ `/properties/${u.listing.slug}` }}" class="tx-panel !shadow-none !border-transparent p-4 flex flex-col gap-1.5">
+            <span class="flex items-center justify-between gap-2">
+              <span class="text-xs font-semibold text-muted">{{ u.type }}</span>
+              <span class="bb-chip bb-chip-ok !py-0.5"><span class="bb-dot bb-dot-ok"></span> Vacant</span>
+            </span>
+            <span class="text-lg font-bold tracking-tight">{{ Fmt.price(u.rent, "rent") }}</span>
+            <span class="text-sm font-medium truncate">{{ u.listing.title }} · {{ u.name }}</span>
+            <span class="text-xs text-muted flex items-center gap-1"><IconMapPin class="w-3.5 h-3.5 shrink-0" /> <span class="truncate">{{ u.listing.location }}</span></span>
+          </a>
+{{/each}}
+        </div>
+      </div>
+    </section>
+{{/if}}
+
+{{#if recent.length > 0}}
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 pt-14 sm:pt-16">
+      <div class="flex items-end justify-between mb-5 gap-4">
+        <div>
+          <p class="tx-eyebrow mb-2">Just listed</p>
+          <h2 class="text-2xl sm:text-[1.75rem] font-bold tracking-tight">Recently added</h2>
+        </div>
+        <a href="/properties?sort=newest" class="tx-btn tx-btn-outline tx-btn-sm shrink-0">More <IconArrowRight class="w-4 h-4" /></a>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+{{#each l in recent}}
+        <ListingCard listing="{{ l }}" />
+{{/each}}
+      </div>
+    </section>
+{{/if}}
+
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 pt-14 sm:pt-16">
+      <div class="text-center max-w-2xl mx-auto mb-8">
+        <p class="tx-eyebrow mb-2">Why Barani</p>
+        <h2 class="text-2xl sm:text-[1.75rem] font-bold tracking-tight">Renting and buying, minus the guesswork</h2>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
+        <div class="tx-panel p-6">
+          <div class="flex items-center justify-between mb-5">
+            <span class="bb-icon-tile bb-tint-leaf"><IconRefresh /></span>
+            <span class="bb-step">1</span>
+          </div>
+          <h3 class="font-bold mb-1.5">Availability you can trust</h3>
+          <p class="text-sm text-muted leading-relaxed">Rentals come straight from our property management records, so a vacant unit here is vacant today.</p>
+        </div>
+        <div class="tx-panel p-6">
+          <div class="flex items-center justify-between mb-5">
+            <span class="bb-icon-tile bb-tint-apricot"><IconCalendarCheck /></span>
+            <span class="bb-step">2</span>
+          </div>
+          <h3 class="font-bold mb-1.5">Viewings without the back-and-forth</h3>
+          <p class="text-sm text-muted leading-relaxed">Pick a day, and an agent calls to confirm. Apply online when you've found the one.</p>
+        </div>
+        <div class="rounded-[18px] p-6 bg-lilac">
+          <div class="flex items-center justify-between mb-5">
+            <span class="bb-icon-tile bg-panel text-brand"><IconMobileMoney /></span>
+            <span class="bb-step">3</span>
+          </div>
+          <h3 class="font-bold mb-1.5">Already a tenant?</h3>
+          <p class="text-sm text-soft leading-relaxed mb-5">See your balance and receipts and pay rent by M-Pesa from the tenant portal.</p>
+          <a href="/tenant" class="tx-btn tx-btn-dark tx-btn-sm">Open the tenant portal <IconArrowRight class="w-4 h-4" /></a>
+        </div>
+      </div>
+    </section>
+
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 pt-14 sm:pt-16" aria-labelledby="landlords-heading">
+      <div class="rounded-[28px] bg-night text-white p-6 sm:p-10 grid lg:grid-cols-[1.1fr_1fr] gap-8 lg:gap-12 items-center relative overflow-hidden isolate">
+        <span class="bb-hero-orb w-80 h-80 -right-24 -bottom-32" aria-hidden="true"></span>
+        <div>
+          <p class="tx-eyebrow !text-[#C4BAFF] mb-3">For landlords</p>
+          <h2 id="landlords-heading" class="text-2xl sm:text-4xl font-bold tracking-tight leading-tight">Own a rental? We'll collect the rent and run the building.</h2>
+          <p class="mt-3 text-white/70 leading-relaxed max-w-xl">From a single unit to a whole block, we find and vet tenants, collect rent, follow up arrears and handle repairs, so you don't have to.</p>
+          <div class="mt-6 flex flex-wrap gap-2">
+            <a href="/contact?topic=landlord" class="tx-btn bg-white !text-[#1B183D] hover:bg-lilac">Talk to us about your property <IconArrowRight class="w-4 h-4" /></a>
+{{#if Site.settings.whatsapp}}
+            <a href="{{ Fmt.whatsapp(Site.settings.whatsapp, 'Hello Barani Better Homes, I own a rental property and would like to talk about management.') }}" target="_blank" rel="noopener" class="tx-btn text-white border-white/20 hover:bg-white/10"><IconWhatsapp class="w-4 h-4" /> WhatsApp</a>
+{{/if}}
+          </div>
+        </div>
+        <ul class="grid sm:grid-cols-2 gap-2.5">
+          <li class="rounded-2xl bg-white/[0.07] border border-white/10 p-4"><span class="bb-icon-tile bb-icon-tile-sm bg-white/10 text-butter mb-3"><IconMobileMoney /></span><p class="font-semibold">Rent collection</p><p class="text-sm text-white/65 mt-0.5">On time, with arrears followed up for you.</p></li>
+          <li class="rounded-2xl bg-white/[0.07] border border-white/10 p-4"><span class="bb-icon-tile bb-icon-tile-sm bg-white/10 text-butter mb-3"><IconKey /></span><p class="font-semibold">Tenant placement</p><p class="text-sm text-white/65 mt-0.5">Vacant units marketed here and filled with vetted tenants.</p></li>
+          <li class="rounded-2xl bg-white/[0.07] border border-white/10 p-4"><span class="bb-icon-tile bb-icon-tile-sm bg-white/10 text-butter mb-3"><IconBuildingOffice /></span><p class="font-semibold">Property management</p><p class="text-sm text-white/65 mt-0.5">Repairs and day-to-day running, arranged for you.</p></li>
+          <li class="rounded-2xl bg-white/[0.07] border border-white/10 p-4"><span class="bb-icon-tile bb-icon-tile-sm bg-white/10 text-butter mb-3"><IconCheck /></span><p class="font-semibold">Tenant portal</p><p class="text-sm text-white/65 mt-0.5">Tenants check balances and pay by M-Pesa online.</p></li>
+        </ul>
+      </div>
+    </section>
+
     <LatestPosts />
-    <CTASection loggedIn="{{ Auth.user }}" hasAuth="{{ true }}" />
   </div>

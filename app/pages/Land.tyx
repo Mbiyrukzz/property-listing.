@@ -1,0 +1,8 @@
+page Land
+
+import ListingBrowser from "./components/ListingBrowser"
+
+title "Land and plots | Barani Better Homes"
+
+template
+  <ListingBrowser heading="Land & plots" intro="Residential and commercial plots for sale and lease." fixedPurpose="" fixedGroup="land" />

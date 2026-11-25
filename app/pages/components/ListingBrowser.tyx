@@ -1,0 +1,263 @@
+component ListingBrowser
+
+import ListingCard from "./ListingCard"
+import { IconSearch, IconFilterX, IconChevronLeft, IconChevronRight, IconSearchX, IconAdjustments, IconMapPin } from "tylix-icons"
+
+props
+  heading: string
+  intro: string
+  fixedPurpose: string
+  fixedGroup: string
+
+uses
+  Site
+
+state
+  purpose: ""
+  category: ""
+  q: ""
+  min: ""
+  max: ""
+  beds: ""
+  sort: "newest"
+  page: 1
+  results: []
+  total: 0
+  totalPages: 1
+  loading: true
+  failed: false
+  showFilters: false
+
+computed
+  categoryOptions() {
+    const all = Site.categories
+    if this.fixedGroup {
+      return all.filter(c => c.group is this.fixedGroup)
+    }
+    return all
+  }
+
+  hasFilters() {
+    return Boolean(this.category or this.q or this.min or this.max or this.beds or (not this.fixedPurpose and this.purpose))
+  }
+
+  showBeds() {
+    return this.fixedGroup is not "land" and this.fixedGroup is not "commercial" and this.category is not "land"
+  }
+
+  summary() {
+    if this.loading {
+      return "Searching…"
+    }
+    return this.total + (this.total is 1 ? " property" : " properties")
+  }
+
+action
+  readUrl() {
+    const p = new URLSearchParams(window.location.search)
+    this.purpose = this.fixedPurpose or p.get("purpose") or ""
+    this.category = p.get("category") ?? ""
+    this.q = p.get("q") ?? ""
+    this.min = p.get("min") ?? ""
+    this.max = p.get("max") ?? ""
+    this.beds = p.get("beds") ?? ""
+    this.sort = p.get("sort") ?? "newest"
+    this.page = Math.max(1, Number(p.get("page") ?? 1) or 1)
+  }
+
+  params(includePreset) {
+    const p = new URLSearchParams()
+    if this.purpose and (includePreset or not this.fixedPurpose) {
+      p.set("purpose", this.purpose)
+    }
+    if this.fixedGroup and includePreset and not this.category {
+      p.set("group", this.fixedGroup)
+    }
+    if this.category {
+      p.set("category", this.category)
+    }
+    if this.q.trim() {
+      p.set("q", this.q.trim())
+    }
+    if this.min {
+      p.set("min", String(this.min))
+    }
+    if this.max {
+      p.set("max", String(this.max))
+    }
+    if this.beds is not "" and this.showBeds {
+      p.set("beds", String(this.beds))
+    }
+    if this.sort and this.sort is not "newest" {
+      p.set("sort", this.sort)
+    }
+    if this.page > 1 {
+      p.set("page", String(this.page))
+    }
+    return p
+  }
+
+  async load() {
+    this.loading = true
+    this.failed = false
+    const p = this.params(true)
+    p.set("limit", "12")
+    const result = await useApi("/api/listings?" + p.toString())
+    if result.ok {
+      this.results = result.data.data
+      this.total = result.data.meta.total
+      this.totalPages = result.data.meta.totalPages
+    } else {
+      this.failed = true
+    }
+    this.loading = false
+    const visible = this.params(false).toString()
+    window.history.replaceState(null, "", window.location.pathname + (visible ? "?" + visible : ""))
+  }
+
+  // onchange runs before bind:value updates, so take the value from the event.
+  setSort(value) {
+    this.sort = value
+    this.apply()
+  }
+
+  apply() {
+    this.page = 1
+    this.showFilters = false
+    this.load()
+  }
+
+  reset() {
+    this.category = ""
+    this.q = ""
+    this.min = ""
+    this.max = ""
+    this.beds = ""
+    this.sort = "newest"
+    if not this.fixedPurpose {
+      this.purpose = ""
+    }
+    this.apply()
+  }
+
+  goTo(n) {
+    this.page = Math.min(Math.max(1, n), this.totalPages)
+    this.load()
+    window.scrollTo({ top: 0, behavior: "smooth" })
+  }
+
+onMount
+  async {
+    this.readUrl()
+    await this.load()
+  }
+
+template
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+    <div class="mb-6 sm:mb-8">
+      <p class="tx-eyebrow mb-2">Browse</p>
+      <h1 class="text-[1.75rem] sm:text-4xl font-bold tracking-tight">{{ heading }}</h1>
+{{#if intro}}
+      <p class="text-soft mt-2 max-w-2xl leading-relaxed">{{ intro }}</p>
+{{/if}}
+    </div>
+
+    <form onsubmit.prevent="{{ apply() }}" class="tx-panel rounded-3xl p-3 sm:p-4 mb-6" role="search" aria-label="Filter properties">
+      <div class="grid grid-cols-[1fr_auto] md:grid-cols-[1fr_auto] gap-2">
+        <label class="sr-only" for="lb-q">Area, estate or keyword</label>
+        <div class="relative col-span-2 md:col-span-1">
+          <IconMapPin class="w-4 h-4 text-muted absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input id="lb-q" class="tx-input !mb-0 !pl-10" placeholder="Area, estate or keyword" bind:value="{{ q }}" />
+        </div>
+        <button type="button" class="tx-btn tx-btn-outline !rounded-[11px] md:hidden" onclick="{{ showFilters = not showFilters }}" aria-expanded="{{ showFilters }}"><IconAdjustments class="w-4 h-4" /> Filters{{ hasFilters ? " •" : "" }}</button>
+        <button type="submit" class="tx-btn tx-btn-primary !rounded-[11px] px-6"><IconSearch class="w-4 h-4" /> Search</button>
+      </div>
+
+      <div class="{{ (showFilters ? 'grid' : 'hidden') + ' md:grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-x-2 gap-y-3 mt-3 pt-3 border-t border-line' }}">
+{{#if not fixedPurpose}}
+        <div>
+          <label class="tx-label" for="lb-purpose">Rent or buy</label>
+          <select id="lb-purpose" class="tx-input !mb-0" bind:value="{{ purpose }}">
+            <option value="">Either</option>
+            <option value="rent">To rent</option>
+            <option value="sale">To buy</option>
+          </select>
+        </div>
+{{/if}}
+        <div>
+          <label class="tx-label" for="lb-category">Type</label>
+          <select id="lb-category" class="tx-input !mb-0" bind:value="{{ category }}">
+            <option value="">Any type</option>
+{{#each c in categoryOptions}}
+            <option value="{{ c.key }}">{{ c.label }}</option>
+{{/each}}
+          </select>
+        </div>
+        <div>
+          <label class="tx-label" for="lb-min">Min price (KES)</label>
+          <input id="lb-min" class="tx-input !mb-0" type="number" min="0" step="1000" inputmode="numeric" placeholder="No min" bind:value="{{ min }}" />
+        </div>
+        <div>
+          <label class="tx-label" for="lb-max">Max price (KES)</label>
+          <input id="lb-max" class="tx-input !mb-0" type="number" min="0" step="1000" inputmode="numeric" placeholder="No max" bind:value="{{ max }}" />
+        </div>
+{{#if showBeds}}
+        <div>
+          <label class="tx-label" for="lb-beds">Bedrooms</label>
+          <select id="lb-beds" class="tx-input !mb-0" bind:value="{{ beds }}">
+            <option value="">Any</option>
+            <option value="0">Bedsitter +</option>
+            <option value="1">1+</option>
+            <option value="2">2+</option>
+            <option value="3">3+</option>
+            <option value="4">4+</option>
+          </select>
+        </div>
+{{/if}}
+        <div>
+          <label class="tx-label" for="lb-sort">Sort</label>
+          <select id="lb-sort" class="tx-input !mb-0" bind:value="{{ sort }}" onchange="{{ setSort($event.target.value) }}">
+            <option value="newest">Newest</option>
+            <option value="price_asc">Price: low to high</option>
+            <option value="price_desc">Price: high to low</option>
+          </select>
+        </div>
+      </div>
+    </form>
+
+    <div class="flex items-center justify-between mb-4 gap-3" aria-live="polite">
+      <p class="text-sm font-semibold text-soft">{{ summary }}</p>
+{{#if hasFilters}}
+      <button class="text-sm tx-link inline-flex items-center gap-1" onclick="{{ reset() }}"><IconFilterX class="w-4 h-4" /> Clear filters</button>
+{{/if}}
+    </div>
+
+{{#if failed}}
+    <div class="tx-alert tx-alert-error"><p class="text-sm">Listings couldn't be loaded. <button class="underline" onclick="{{ load() }}">Try again</button></p></div>
+{{#else if loading and results.length is 0}}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+      <div class="bb-card h-72 animate-pulse"></div><div class="bb-card h-72 animate-pulse hidden sm:block"></div><div class="bb-card h-72 animate-pulse hidden lg:block"></div>
+    </div>
+{{#else if results.length is 0}}
+    <div class="rounded-3xl bg-lilac px-6 py-12 text-center">
+      <span class="bb-icon-tile bg-panel text-brand mx-auto mb-4"><IconSearchX /></span>
+      <h2 class="font-bold text-lg mb-1">Nothing matches yet</h2>
+      <p class="text-sm text-soft mb-5 max-w-md mx-auto">Try a wider price range or another area, or tell us what you're looking for and we'll call you when it comes up.</p>
+      <a href="/contact" class="tx-btn tx-btn-dark tx-btn-sm">Tell us what you need</a>
+    </div>
+{{#else}}
+    <div class="{{ 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 transition-opacity ' + (loading ? 'opacity-60' : '') }}">
+{{#each l in results}}
+      <ListingCard listing="{{ l }}" />
+{{/each}}
+    </div>
+
+{{#if totalPages > 1}}
+    <nav class="flex items-center justify-center gap-3 mt-8" aria-label="Pages">
+      <button class="tx-btn tx-btn-outline tx-btn-sm" disabled="{{ page <= 1 }}" onclick="{{ goTo(page - 1) }}"><IconChevronLeft class="w-4 h-4" /> Previous</button>
+      <span class="text-sm font-medium text-muted">Page {{ page }} of {{ totalPages }}</span>
+      <button class="tx-btn tx-btn-outline tx-btn-sm" disabled="{{ page >= totalPages }}" onclick="{{ goTo(page + 1) }}">Next <IconChevronRight class="w-4 h-4" /></button>
+    </nav>
+{{/if}}
+{{/if}}
+  </div>

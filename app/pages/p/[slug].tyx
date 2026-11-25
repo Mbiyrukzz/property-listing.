@@ -1,0 +1,146 @@
+page SitePageView
+
+import { IconKey, IconHome, IconMobileMoney, IconTool, IconCheck, IconWhatsapp, IconMail, IconArrowRight, IconBuildingOffice } from "tylix-icons"
+
+title "Barani Better Homes"
+
+props
+  slug: string
+
+uses
+  Fmt
+  Site
+
+state
+  page: null
+  loading: true
+  isMissing: false
+  services: [
+    { icon: "home", tint: "lilac", title: "Lettings", text: "Homes, offices and shops to let, with live availability straight from our records." },
+    { icon: "office", tint: "apricot", title: "Sales & land", text: "Houses, plots and commercial property for sale, with viewings arranged around you." },
+    { icon: "money", tint: "leaf", title: "Rent collection", text: "We collect rent on your behalf, follow up arrears and keep you up to date." },
+    { icon: "wrench", tint: "blush", title: "Property management", text: "Tenants, repairs and day-to-day running of your building, handled for you." }
+  ]
+  steps: [
+    { title: "Tell us about your property", text: "Where it is, how many units, and what you need help with." },
+    { title: "We agree a plan", text: "Letting only, rent collection, or full management: you choose." },
+    { title: "We take it from there", text: "We find tenants, collect rent and look after the building." }
+  ]
+
+onMount
+  async {
+    const result = await useApi(`/api/pages/${encodeURIComponent(this.slug)}`)
+    if result.ok {
+      this.page = result.data.data
+      document.title = this.page.title + " | Barani Better Homes"
+    } else {
+      this.isMissing = true
+    }
+    this.loading = false
+  }
+
+computed
+  isAbout() {
+    return this.slug is "about"
+  }
+
+template
+  <div>
+{{#if loading}}
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-12"><div class="h-40 bb-card animate-pulse" data-page-loader="true"></div></div>
+{{#else if isMissing}}
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      <h1 class="text-2xl font-bold mb-2">Page not found</h1>
+      <a href="/" class="tx-link">Go to the homepage</a>
+    </div>
+{{#else if isAbout}}
+    <section class="bb-hero">
+      <span class="bb-hero-orb w-[30rem] h-[30rem] -right-40 -top-48" aria-hidden="true"></span>
+      <div class="max-w-5xl mx-auto px-4 sm:px-8 py-12 sm:py-16">
+        <p class="tx-eyebrow mb-3">About us</p>
+        <h1 class="text-[2rem] leading-[1.1] sm:text-5xl font-bold tracking-tight max-w-3xl">{{ page.title }}</h1>
+        <p class="mt-4 text-base sm:text-lg text-white/75 max-w-2xl leading-relaxed">{{ Site.settings.about_short }}</p>
+        <div class="mt-6 flex flex-wrap gap-2">
+          <a href="/contact?topic=landlord" class="tx-btn bg-white !text-[#1B183D] hover:bg-lilac">I'm a landlord <IconArrowRight class="w-4 h-4" /></a>
+          <a href="/properties" class="tx-btn text-white border-white/25 hover:bg-white/10">Find a property</a>
+        </div>
+      </div>
+    </section>
+
+    <div class="max-w-5xl mx-auto px-4 sm:px-6">
+      <section class="pt-12 sm:pt-16" aria-labelledby="what-we-do">
+        <p class="tx-eyebrow mb-2">What we do</p>
+        <h2 id="what-we-do" class="text-2xl sm:text-[1.75rem] font-bold tracking-tight mb-6">One agency for renting, buying and owning</h2>
+        <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+{{#each item in services}}
+          <div class="tx-panel p-5">
+            <span class="{{ 'bb-icon-tile mb-4 bb-tint-' + item.tint }}">
+{{#if item.icon is "home"}}<IconHome />{{#else if item.icon is "office"}}<IconBuildingOffice />{{#else if item.icon is "money"}}<IconMobileMoney />{{#else}}<IconTool />{{/if}}
+            </span>
+            <h3 class="font-bold mb-1">{{ item.title }}</h3>
+            <p class="text-sm text-muted leading-relaxed">{{ item.text }}</p>
+          </div>
+{{/each}}
+        </div>
+      </section>
+
+      <section class="pt-12 sm:pt-16 grid lg:grid-cols-[1fr_1fr] gap-8 lg:gap-12 items-start">
+        <div>
+          <p class="tx-eyebrow mb-2">Our story</p>
+          <h2 class="text-2xl sm:text-[1.75rem] font-bold tracking-tight mb-4">Property, done properly</h2>
+          <div class="bb-prose"><p>{{ page.body }}</p></div>
+        </div>
+
+        <div id="landlords" class="rounded-[24px] bg-night text-white p-6 sm:p-8 scroll-mt-24">
+          <p class="tx-eyebrow !text-[#C4BAFF] mb-2">For landlords</p>
+          <h2 class="text-2xl font-bold tracking-tight mb-2">Your building, looked after</h2>
+          <p class="text-sm text-white/70 leading-relaxed mb-6">Hand over the day-to-day and get rent on time, without the phone calls.</p>
+          <ol class="space-y-4 mb-6">
+{{#each step, i in steps}}
+            <li class="flex gap-3">
+              <span class="bb-step !bg-white/10 !border-white/15 !text-white">{{ i + 1 }}</span>
+              <div>
+                <p class="font-semibold">{{ step.title }}</p>
+                <p class="text-sm text-white/65">{{ step.text }}</p>
+              </div>
+            </li>
+{{/each}}
+          </ol>
+          <div class="rounded-2xl bg-white/[0.06] p-4 mb-6 flex items-start gap-3">
+            <span class="bb-icon-tile bb-icon-tile-sm bg-white/10 text-butter"><IconKey /></span>
+            <p class="text-sm text-white/80">Your tenants get our online portal to check balances, download receipts and pay rent by M-Pesa.</p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <a href="/contact?topic=landlord" class="tx-btn tx-btn-sm bg-white !text-[#1B183D] hover:bg-lilac">Talk to us <IconArrowRight class="w-4 h-4" /></a>
+{{#if Site.settings.whatsapp}}
+            <a href="{{ Fmt.whatsapp(Site.settings.whatsapp, 'Hello Barani Better Homes, I own a rental property and would like to talk about management.') }}" target="_blank" rel="noopener" class="tx-btn tx-btn-sm text-white border-white/20 hover:bg-white/10"><IconWhatsapp class="w-4 h-4" /> WhatsApp</a>
+{{/if}}
+          </div>
+        </div>
+      </section>
+
+      <section class="pt-12 sm:pt-16">
+        <div class="bb-sand rounded-[24px] p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-5">
+          <div>
+            <h2 class="text-xl sm:text-2xl font-bold tracking-tight">Let's talk</h2>
+            <p class="text-sm text-soft mt-1">{{ Site.settings.office_hours }}</p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+{{#if Site.settings.whatsapp}}
+            <a href="{{ Fmt.whatsapp(Site.settings.whatsapp, 'Hello Barani Better Homes') }}" target="_blank" rel="noopener" class="tx-btn tx-btn-dark"><IconWhatsapp class="w-4 h-4" /> {{ Site.settings.whatsapp }}</a>
+{{/if}}
+{{#if Site.settings.email}}
+            <a href="{{ `mailto:${Site.settings.email}` }}" class="tx-btn tx-btn-outline"><IconMail class="w-4 h-4" /> {{ Site.settings.email }}</a>
+{{/if}}
+          </div>
+        </div>
+      </section>
+    </div>
+{{#else}}
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      <h1 class="text-[1.75rem] leading-tight sm:text-3xl font-bold tracking-tight mb-6">{{ page.title }}</h1>
+      <div class="tx-panel p-5 sm:p-8"><div class="bb-prose"><p>{{ page.body }}</p></div></div>
+      <p class="text-xs text-muted mt-6">Last updated {{ Fmt.date(page.updatedAt) }}</p>
+    </div>
+{{/if}}
+  </div>

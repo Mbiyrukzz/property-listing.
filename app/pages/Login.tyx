@@ -9,18 +9,28 @@ needs
   Auth
 
 state
+  next: "/dashboard"
   email: ""
   password: ""
   remember: false
   error: ""
   submitting: false
   perks: [
-    "Manage your posts from one dashboard",
-    "Upload cover images for every post",
-    "Your session refreshes automatically"
+    "Save properties and get back to them anywhere",
+    "Book viewings and follow your applications",
+    "Tenants: see your balance and pay rent by M-Pesa"
   ]
 
 action
+  // Where to go after signing in: ?next=/some/path on this site, else the
+  // dashboard. Only same-site paths ("/x", never "//host" or "/\host").
+  readNext() {
+    const wanted = new URLSearchParams(window.location.search).get("next") ?? ""
+    if wanted.startsWith("/") and not wanted.startsWith("//") and not wanted.startsWith("/\\") {
+      this.next = wanted
+    }
+  }
+
   setField(field, value) {
     this[field] = value
   }
@@ -79,7 +89,7 @@ action
 
       if result.ok {
         succeeded = true
-        window.location.href = "/dashboard"
+        window.location.href = this.next
       } else {
         this.error = this.messageFor(result)
       }
@@ -94,23 +104,24 @@ action
 
 onMount
   {
+    this.readNext()
     if Auth.user {
-      window.location.href = "/dashboard"
+      window.location.href = this.next
     }
   }
 
 template
-  <div class="flex items-center justify-center px-6 py-16">
+  <div class="flex items-center justify-center px-3 sm:px-6 py-6 sm:py-16">
     <div class="tx-auth tx-glow">
 
       <div class="tx-auth-aside">
-        <p class="tx-eyebrow mb-5">Signed-in session</p>
-        <h2 class="text-2xl font-semibold tracking-tight mb-3">Welcome back</h2>
-        <p class="text-sm text-muted mb-8 leading-relaxed">Log in to pick up where you left off.</p>
+        <p class="tx-eyebrow mb-5">Barani Better Homes</p>
+        <h2 class="text-3xl font-bold tracking-tight mb-3">Welcome back</h2>
+        <p class="text-sm text-muted mb-8 leading-relaxed">Your saved homes, viewings and rent, all in one place.</p>
         <ul class="space-y-3">
 {{#each perk in perks}}
           <li class="flex items-start gap-2.5 text-sm text-soft">
-            <IconCheck class="w-4 h-4 mt-0.5 text-mint shrink-0" />
+            <span class="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center shrink-0"><IconCheck class="w-3 h-3" /></span>
             {{ perk }}
           </li>
 {{/each}}
@@ -119,8 +130,8 @@ template
 
       <div class="tx-auth-form">
         <div class="w-full max-w-sm">
-          <h1 class="text-2xl font-semibold tracking-tight mb-1">Log in</h1>
-          <p class="text-sm text-muted mb-8">Continue to your dashboard.</p>
+          <h1 class="text-2xl font-bold tracking-tight mb-1">Log in</h1>
+          <p class="text-sm text-muted mb-8">Pick up where you left off.</p>
 
 {{#if error}}
           <div role="alert" aria-live="polite" class="tx-alert tx-alert-error mb-6">
@@ -128,7 +139,7 @@ template
           </div>
 {{/if}}
 
-          <OAuthButtons returnTo="{{ '/dashboard' }}" />
+          <OAuthButtons returnTo="{{ next }}" />
 
           <label for="email" class="tx-label">Email</label>
           <input
@@ -163,7 +174,7 @@ template
                 type="checkbox"
                 checked="{{ remember }}"
                 onclick="{{ toggleRemember() }}"
-                class="rounded border-line-strong bg-canvas text-mint focus:ring-aqua"
+                class="tx-check rounded"
               />
               Remember me
             </label>
@@ -179,7 +190,7 @@ template
           </button>
 
           <p class="text-sm text-muted text-center mt-6">
-            Need an account? <a href="/register" class="tx-link">Sign up</a>
+            Need an account? <a href="{{ next is '/dashboard' ? '/register' : '/register?next=' + encodeURIComponent(next) }}" class="tx-link">Sign up</a>
           </p>
         </div>
       </div>

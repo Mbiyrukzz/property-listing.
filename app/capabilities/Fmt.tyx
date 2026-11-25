@@ -1,0 +1,115 @@
+capability Fmt
+
+state
+  locale: "en-KE"
+
+action
+  kes(value) {
+    const n = Number(value)
+    if not Number.isFinite(n) {
+      return "KES —"
+    }
+    return "KES " + Math.round(n).toLocaleString(this.locale)
+  }
+
+  price(value, purpose) {
+    const n = Number(value)
+    if not Number.isFinite(n) or n <= 0 {
+      return "Price on request"
+    }
+    if purpose is "rent" {
+      return this.kes(n) + " / month"
+    }
+    if n >= 1000000 {
+      const m = (n / 1000000).toFixed(n >= 10000000 ? 1 : 2).replace(/\.?0+$/, "")
+      return "KES " + m + "M"
+    }
+    return this.kes(n)
+  }
+
+  date(value) {
+    if not value {
+      return ""
+    }
+    const text = String(value)
+    const d = new Date(text.length is 10 ? text + "T00:00:00" : text)
+    if Number.isNaN(d.getTime()) {
+      return ""
+    }
+    return d.toLocaleDateString(this.locale, { day: "numeric", month: "short", year: "numeric" })
+  }
+
+  dateTime(value) {
+    if not value {
+      return ""
+    }
+    const d = new Date(String(value))
+    if Number.isNaN(d.getTime()) {
+      return ""
+    }
+    return d.toLocaleString(this.locale, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+  }
+
+  ago(value) {
+    if not value {
+      return ""
+    }
+    const ms = Date.now() - new Date(String(value)).getTime()
+    if not Number.isFinite(ms) {
+      return ""
+    }
+    const min = Math.round(ms / 60000)
+    if min < 1 {
+      return "just now"
+    }
+    if min < 60 {
+      return min + " min ago"
+    }
+    const h = Math.round(min / 60)
+    if h < 24 {
+      return h + " h ago"
+    }
+    const days = Math.round(h / 24)
+    if days < 30 {
+      return days + (days is 1 ? " day ago" : " days ago")
+    }
+    return this.date(value)
+  }
+
+  beds(n) {
+    if n is null or n is undefined or n is "" {
+      return ""
+    }
+    const v = Number(n)
+    if v is 0 {
+      return "Bedsitter / studio"
+    }
+    return v + (v is 1 ? " bed" : " beds")
+  }
+
+  whatsapp(phone, text) {
+    let digits = String(phone ?? "").replace(/\D/g, "")
+    if not digits {
+      return ""
+    }
+    if digits.startsWith("0") {
+      digits = "254" + digits.slice(1)
+    }
+    return "https://wa.me/" + digits + (text ? "?text=" + encodeURIComponent(text) : "")
+  }
+
+  label(value) {
+    const text = String(value ?? "").replace(/_/g, " ")
+    return text.charAt(0).toUpperCase() + text.slice(1)
+  }
+
+  firstError(result, fallback) {
+    const errors = result?.data?.errors
+    if errors and typeof errors is "object" {
+      const key = Object.keys(errors)[0]
+      if key and Array.isArray(errors[key]) and errors[key][0] {
+        return String(errors[key][0])
+      }
+    }
+    return result?.data?.error ?? result?.error ?? fallback ?? "Something went wrong. Try again."
+  }

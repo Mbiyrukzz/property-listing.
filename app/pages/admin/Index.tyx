@@ -1,0 +1,173 @@
+page AdminOverview
+
+import AdminNav from "../components/AdminNav"
+import { IconBuildingOffice, IconKey, IconChatBubble, IconCalendarCheck, IconClipboardCheck, IconEye, IconStar, IconCheckCircle, IconExclamationTriangle, IconArrowRight } from "tylix-icons"
+
+title "Admin | Barani Better Homes"
+
+needs
+  Auth
+
+permissions
+  admin.access
+
+uses
+  Fmt
+
+state
+  loading: true
+  loadError: ""
+  stats: null
+  enquiries: []
+  viewings: []
+  integration: null
+
+computed
+  syncOk() {
+    return this.integration and this.integration.configured and this.integration.lastSyncStatus is not "error"
+  }
+
+action
+  async load() {
+    this.loadError = ""
+    const result = await useApi("/api/admin/overview")
+    if result.ok {
+      this.stats = result.data.stats
+      this.enquiries = result.data.enquiries
+      this.viewings = result.data.viewings
+      this.integration = result.data.integration
+    } else {
+      this.loadError = Fmt.firstError(result, "The overview couldn't be loaded. Refresh to try again.")
+    }
+    this.loading = false
+  }
+
+onMount
+  async {
+    await this.load()
+  }
+
+template
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-5 sm:py-8 grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-4 lg:gap-8">
+    <AdminNav current="overview" />
+
+    <div class="min-w-0">
+      <p class="tx-eyebrow mb-2">Administration</p>
+      <h1 class="text-[1.75rem] leading-tight sm:text-3xl font-bold tracking-tight mb-6">Overview</h1>
+
+{{#if loadError}}
+      <div class="tx-alert tx-alert-error mb-6" role="alert"><p class="text-sm">{{ loadError }}</p></div>
+{{/if}}
+
+{{#if loading}}
+      <div data-page-loader="true" class="text-sm text-muted">Loading…</div>
+{{#else if stats}}
+{{#if integration and not integration.configured}}
+      <div class="tx-alert tx-alert-info mb-6 flex items-start gap-2"><IconExclamationTriangle class="w-4 h-4 mt-0.5 shrink-0" /><p class="text-sm">HQ isn't connected yet: set HQ_URL and HQ_API_TOKEN in .env. Rental listings come from there.</p></div>
+{{#else if integration and integration.lastSyncStatus is "error"}}
+      <div class="tx-alert tx-alert-error mb-6 flex items-start gap-2"><IconExclamationTriangle class="w-4 h-4 mt-0.5 shrink-0" /><p class="text-sm">The last HQ sync failed{{ integration.lastSyncMessage ? ": " + integration.lastSyncMessage : "" }}. <a class="tx-link" href="/admin/integration">See the sync log</a>.</p></div>
+{{/if}}
+
+      <div class="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-3">
+        <a href="/admin/listings?published=1" class="tx-panel p-4 sm:p-5 flex flex-col gap-3">
+          <span class="bb-icon-tile bb-icon-tile-sm bb-tint-lilac"><IconBuildingOffice /></span>
+          <div><p class="text-2xl sm:text-[1.75rem] font-bold tracking-tight leading-none">{{ stats.published }}</p><p class="text-xs text-muted mt-1.5">Published · {{ stats.forRent }} rent, {{ stats.forSale }} sale</p></div>
+        </a>
+        <a href="/vacant-units" class="tx-panel p-4 sm:p-5 flex flex-col gap-3">
+          <span class="bb-icon-tile bb-icon-tile-sm bb-tint-leaf"><IconKey /></span>
+          <div><p class="text-2xl sm:text-[1.75rem] font-bold tracking-tight leading-none">{{ stats.vacantUnits }}</p><p class="text-xs text-muted mt-1.5">Vacant units listed</p></div>
+        </a>
+        <a href="/admin/listings" class="tx-panel p-4 sm:p-5 flex flex-col gap-3">
+          <span class="bb-icon-tile bb-icon-tile-sm bb-tint-butter"><IconStar /></span>
+          <div><p class="text-2xl sm:text-[1.75rem] font-bold tracking-tight leading-none">{{ stats.featured }}</p><p class="text-xs text-muted mt-1.5">Featured on the homepage</p></div>
+        </a>
+        <a href="/admin/reports" class="tx-panel p-4 sm:p-5 flex flex-col gap-3">
+          <span class="bb-icon-tile bb-icon-tile-sm bb-tint-blush"><IconEye /></span>
+          <div><p class="text-2xl sm:text-[1.75rem] font-bold tracking-tight leading-none">{{ stats.views30 }}</p><p class="text-xs text-muted mt-1.5">Listing views, last 30 days</p></div>
+        </a>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6 sm:mb-8">
+        <a href="/admin/enquiries?status=new" class="rounded-[18px] bg-night text-white p-4 flex items-center gap-3 hover:bg-night-2 transition-colors">
+          <span class="bb-icon-tile bb-icon-tile-sm bg-white/10 text-butter"><IconChatBubble /></span>
+          <div class="flex-1"><p class="text-xl font-bold leading-none">{{ stats.newEnquiries }}</p><p class="text-xs text-white/70 mt-1">New enquiries</p></div>
+          <IconArrowRight class="w-4 h-4 text-white/60" />
+        </a>
+        <a href="/admin/viewings" class="tx-panel p-4 flex items-center gap-3">
+          <span class="bb-icon-tile bb-icon-tile-sm bb-tint-apricot"><IconCalendarCheck /></span>
+          <div class="flex-1"><p class="text-xl font-bold leading-none">{{ stats.openViewings }}</p><p class="text-xs text-muted mt-1">Viewings to confirm or attend</p></div>
+          <IconArrowRight class="w-4 h-4 text-muted" />
+        </a>
+        <a href="/admin/applications" class="tx-panel p-4 flex items-center gap-3">
+          <span class="bb-icon-tile bb-icon-tile-sm bb-tint-lilac"><IconClipboardCheck /></span>
+          <div class="flex-1"><p class="text-xl font-bold leading-none">{{ stats.openApplications }}</p><p class="text-xs text-muted mt-1">Applications to review</p></div>
+          <IconArrowRight class="w-4 h-4 text-muted" />
+        </a>
+      </div>
+
+      <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6 items-start mb-6">
+        <section class="tx-panel overflow-hidden">
+          <div class="flex items-center justify-between px-5 py-4 border-b border-line">
+            <h2 class="font-semibold">New enquiries</h2>
+            <a href="/admin/enquiries" class="text-sm tx-link">All enquiries</a>
+          </div>
+{{#if enquiries.length is 0}}
+          <p class="p-4 text-sm text-muted">No new enquiries. You're up to date.</p>
+{{#else}}
+          <ul class="divide-y divide-line">
+{{#each e in enquiries}}
+            <li class="px-5 py-3.5 flex items-center justify-between gap-3 hover:bg-raised">
+              <div class="min-w-0">
+                <p class="text-sm font-medium truncate">{{ e.name }} · {{ e.phone }}</p>
+                <p class="text-xs text-muted truncate">{{ e.listing ?? "General enquiry" }} · {{ Fmt.ago(e.createdAt) }}</p>
+              </div>
+              <span class="bb-chip bb-chip-brand">{{ Fmt.label(e.kind) }}</span>
+            </li>
+{{/each}}
+          </ul>
+{{/if}}
+        </section>
+
+        <section class="tx-panel overflow-hidden">
+          <div class="flex items-center justify-between px-5 py-4 border-b border-line">
+            <h2 class="font-semibold">Upcoming viewings</h2>
+            <a href="/admin/viewings" class="text-sm tx-link">All viewings</a>
+          </div>
+{{#if viewings.length is 0}}
+          <p class="p-4 text-sm text-muted">No open viewing requests.</p>
+{{#else}}
+          <ul class="divide-y divide-line">
+{{#each v in viewings}}
+            <li class="px-5 py-3.5 flex items-center justify-between gap-3 hover:bg-raised">
+              <div class="min-w-0">
+                <p class="text-sm font-medium truncate">{{ v.name }} · {{ v.phone }}</p>
+                <p class="text-xs text-muted truncate">{{ v.listing ?? "Listing removed" }} · {{ Fmt.date(v.preferredDate) }}, {{ v.preferredTime }}</p>
+              </div>
+              <span class="{{ v.status is 'confirmed' ? 'bb-chip bb-chip-ok' : 'bb-chip bb-chip-warn' }}">{{ Fmt.label(v.status) }}</span>
+            </li>
+{{/each}}
+          </ul>
+{{/if}}
+        </section>
+      </div>
+
+{{#if integration}}
+      <section class="tx-panel p-5 flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-start gap-3">
+{{#if syncOk}}
+          <span class="bb-icon-tile bb-icon-tile-sm bb-tint-leaf"><IconCheckCircle /></span>
+{{#else}}
+          <span class="bb-icon-tile bb-icon-tile-sm bb-tint-blush"><IconExclamationTriangle /></span>
+{{/if}}
+          <div>
+            <h2 class="font-semibold">HQ sync</h2>
+            <p class="text-sm text-muted">{{ integration.lastSyncAt ? "Last full sync " + Fmt.ago(integration.lastSyncAt) + " (" + Fmt.label(integration.lastSyncStatus) + ")" : "No full sync has run yet." }}{{ integration.lastErrorAt ? " · last error " + Fmt.ago(integration.lastErrorAt) : "" }}</p>
+          </div>
+        </div>
+{{#if can("integration.view")}}
+        <a href="/admin/integration" class="tx-btn tx-btn-outline tx-btn-sm">Sync status <IconArrowRight class="w-4 h-4" /></a>
+{{/if}}
+      </section>
+{{/if}}
+{{/if}}
+    </div>
+  </div>

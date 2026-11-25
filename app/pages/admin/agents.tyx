@@ -1,0 +1,200 @@
+page AdminAgents
+
+import AdminNav from "../components/AdminNav"
+import { IconPlus, IconIdCard, IconPhone, IconMail, IconPencil, IconTrash } from "tylix-icons"
+
+title "Agents | Barani Better Homes admin"
+
+needs
+  Auth
+
+permissions
+  admin.access
+
+uses
+  Fmt
+
+state
+  rows: []
+  loading: true
+  loadError: ""
+  editingId: null
+  showForm: false
+  form: { name: "", title: "", phone: "", whatsapp: "", email: "", photo: "", bio: "", isActive: true }
+  errors: {}
+  formError: ""
+  notice: ""
+  saving: false
+
+action
+  fieldError(field) {
+    const list = this.errors[field]
+    return Array.isArray(list) and list.length > 0 ? list[0] : ""
+  }
+
+  async load() {
+    const result = await useApi("/api/admin/agents")
+    if result.ok {
+      this.rows = result.data.data
+    } else {
+      this.loadError = Fmt.firstError(result)
+    }
+    this.loading = false
+  }
+
+  startNew() {
+    this.editingId = null
+    this.form = { name: "", title: "", phone: "", whatsapp: "", email: "", photo: "", bio: "", isActive: true }
+    this.errors = {}
+    this.formError = ""
+    this.notice = ""
+    this.showForm = true
+  }
+
+  startEdit(a) {
+    this.editingId = a.id
+    this.form = { name: a.name, title: a.title, phone: a.phone, whatsapp: a.whatsapp, email: a.email, photo: a.photo ?? "", bio: a.bio, isActive: a.isActive }
+    this.errors = {}
+    this.formError = ""
+    this.notice = ""
+    this.showForm = true
+  }
+
+  async save() {
+    this.saving = true
+    this.errors = {}
+    this.formError = ""
+    const result = this.editingId
+      ? await useApi(`/api/admin/agents/${this.editingId}`, { method: "PUT", body: this.form })
+      : await useApi("/api/admin/agents", { method: "POST", body: this.form })
+    this.saving = false
+    if result.ok {
+      this.notice = this.editingId ? "Agent updated." : "Agent added."
+      this.showForm = false
+      await this.load()
+      return null
+    }
+    if result.status is 422 and result.data and result.data.errors {
+      this.errors = result.data.errors
+      return null
+    }
+    this.formError = Fmt.firstError(result)
+  }
+
+  async remove(a) {
+    const what = a.listings > 0 ? " Their " + a.listings + " listing(s) will show the office contact instead." : ""
+    if not confirm("Remove " + a.name + "?" + what) {
+      return null
+    }
+    const result = await useApi(`/api/admin/agents/${a.id}`, { method: "DELETE" })
+    this.notice = result.ok ? a.name + " removed." : Fmt.firstError(result)
+    this.showForm = false
+    await this.load()
+  }
+
+onMount
+  async {
+    await this.load()
+  }
+
+template
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-5 sm:py-8 grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-4 lg:gap-8">
+    <AdminNav current="agents" />
+
+    <div class="min-w-0">
+      <div class="flex flex-wrap items-end justify-between gap-3 mb-6">
+        <div>
+          <h1 class="text-2xl font-bold tracking-tight">Agents</h1>
+          <p class="text-sm text-muted mt-1">The contact shown on a listing. Listings without an agent show the office phone.</p>
+        </div>
+{{#if can("agents.manage")}}
+        <button class="tx-btn tx-btn-primary tx-btn-sm" onclick="{{ startNew() }}"><IconPlus class="w-4 h-4" /> Add agent</button>
+{{/if}}
+      </div>
+
+{{#if notice}}<div class="tx-alert tx-alert-success mb-4" role="status"><p class="text-sm">{{ notice }}</p></div>{{/if}}
+{{#if loadError}}<div class="tx-alert tx-alert-error mb-4" role="alert"><p class="text-sm">{{ loadError }}</p></div>{{/if}}
+
+{{#if showForm}}
+      <form class="tx-panel p-5 mb-6" onsubmit.prevent="{{ save() }}" novalidate>
+        <h2 class="font-semibold mb-4">{{ editingId ? "Edit agent" : "New agent" }}</h2>
+{{#if formError}}<div class="tx-alert tx-alert-error mb-4" role="alert"><p class="text-sm">{{ formError }}</p></div>{{/if}}
+        <div class="grid sm:grid-cols-2 gap-x-4">
+          <div>
+            <label class="tx-label" for="ag-name">Name</label>
+            <input id="ag-name" class="tx-input" bind:value="{{ form.name }}" aria-invalid="{{ fieldError('name') ? 'true' : 'false' }}" />
+{{#if fieldError("name")}}<p class="text-xs text-coral -mt-3 mb-3">{{ fieldError("name") }}</p>{{/if}}
+          </div>
+          <div>
+            <label class="tx-label" for="ag-title">Title (optional)</label>
+            <input id="ag-title" class="tx-input" placeholder="e.g. Sales agent, Mombasa" bind:value="{{ form.title }}" />
+          </div>
+          <div>
+            <label class="tx-label" for="ag-phone">Phone</label>
+            <input id="ag-phone" class="tx-input" type="tel" placeholder="0712 345 678" bind:value="{{ form.phone }}" aria-invalid="{{ fieldError('phone') ? 'true' : 'false' }}" />
+{{#if fieldError("phone")}}<p class="text-xs text-coral -mt-3 mb-3">{{ fieldError("phone") }}</p>{{/if}}
+          </div>
+          <div>
+            <label class="tx-label" for="ag-wa">WhatsApp (optional)</label>
+            <input id="ag-wa" class="tx-input" type="tel" bind:value="{{ form.whatsapp }}" aria-invalid="{{ fieldError('whatsapp') ? 'true' : 'false' }}" />
+{{#if fieldError("whatsapp")}}<p class="text-xs text-coral -mt-3 mb-3">{{ fieldError("whatsapp") }}</p>{{/if}}
+          </div>
+          <div>
+            <label class="tx-label" for="ag-email">Email (optional)</label>
+            <input id="ag-email" class="tx-input" type="email" bind:value="{{ form.email }}" aria-invalid="{{ fieldError('email') ? 'true' : 'false' }}" />
+{{#if fieldError("email")}}<p class="text-xs text-coral -mt-3 mb-3">{{ fieldError("email") }}</p>{{/if}}
+          </div>
+          <div>
+            <label class="tx-label" for="ag-photo">Photo URL (optional)</label>
+            <input id="ag-photo" class="tx-input" placeholder="https://…" bind:value="{{ form.photo }}" />
+          </div>
+        </div>
+        <label class="tx-label" for="ag-bio">Short bio (optional)</label>
+        <textarea id="ag-bio" class="tx-input" rows="3" bind:value="{{ form.bio }}"></textarea>
+        <label class="flex items-center gap-2 text-sm mb-4"><input type="checkbox" bind:checked="{{ form.isActive }}" /> Active (can be assigned to listings and leads)</label>
+        <div class="flex gap-2">
+          <button type="submit" class="tx-btn tx-btn-primary tx-btn-sm" disabled="{{ saving }}">{{ saving ? "Saving…" : "Save agent" }}</button>
+          <button type="button" class="tx-btn tx-btn-ghost tx-btn-sm" onclick="{{ showForm = false }}">Cancel</button>
+        </div>
+      </form>
+{{/if}}
+
+{{#if loading}}
+      <div data-page-loader="true" class="text-sm text-muted">Loading…</div>
+{{#else if rows.length is 0}}
+      <div class="tx-panel p-8 text-center">
+        <IconIdCard class="w-6 h-6 text-muted mx-auto mb-3" />
+        <p class="text-sm text-muted">No agents yet.</p>
+      </div>
+{{#else}}
+      <div class="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
+{{#each a in rows}}
+        <article class="tx-panel p-4 flex flex-col">
+          <div class="flex items-start gap-3 mb-3">
+{{#if a.photo}}
+            <img src="{{ a.photo }}" alt="" class="w-12 h-12 rounded-full object-cover border border-line shrink-0" />
+{{#else}}
+            <span class="w-12 h-12 rounded-full bg-raised grid place-items-center text-muted font-semibold shrink-0">{{ a.name.charAt(0) }}</span>
+{{/if}}
+            <div class="min-w-0">
+              <p class="font-medium truncate">{{ a.name }}</p>
+              <p class="text-xs text-muted truncate">{{ a.title or "Agent" }} · {{ a.listings }} {{ a.listings is 1 ? "listing" : "listings" }}</p>
+            </div>
+{{#if not a.isActive}}<span class="bb-chip bb-chip-muted ml-auto">Inactive</span>{{/if}}
+          </div>
+          <div class="text-sm space-y-1 mb-3 flex-1">
+{{#if a.phone}}<p class="flex items-center gap-2 text-soft"><IconPhone class="w-4 h-4 text-muted" /> {{ a.phone }}</p>{{/if}}
+{{#if a.email}}<p class="flex items-center gap-2 text-soft break-all"><IconMail class="w-4 h-4 text-muted shrink-0" /> {{ a.email }}</p>{{/if}}
+          </div>
+{{#if can("agents.manage")}}
+          <div class="flex gap-2">
+            <button class="tx-btn tx-btn-outline tx-btn-sm" onclick="{{ startEdit(a) }}"><IconPencil class="w-4 h-4" /> Edit</button>
+            <button class="tx-btn tx-btn-ghost tx-btn-sm" aria-label="Remove {{ a.name }}" onclick="{{ remove(a) }}"><IconTrash class="w-4 h-4" /></button>
+          </div>
+{{/if}}
+        </article>
+{{/each}}
+      </div>
+{{/if}}
+    </div>
+  </div>

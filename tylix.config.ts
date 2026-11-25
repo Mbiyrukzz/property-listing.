@@ -7,9 +7,9 @@ export default defineConfig({
   // visitors get public/offline.html. See the @tylix/pwa README for caching
   // rules, shortcuts and screenshots.
   pwa: {
-    name: "Bbhomes",
-    shortName: "Bbhomes",
-    themeColor: "#0034CA",
+    name: "Barani Better Homes",
+    shortName: "Barani Homes",
+    themeColor: "#282270",
     backgroundColor: "#ffffff",
   },
   auth: {

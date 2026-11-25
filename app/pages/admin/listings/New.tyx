@@ -1,0 +1,21 @@
+page AdminListingNew
+
+import AdminNav from "../../components/AdminNav"
+import ListingEditor from "../../components/ListingEditor"
+
+title "New listing | Barani Better Homes admin"
+
+needs
+  Auth
+  Site
+
+permissions
+  listings.manage
+
+template
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-5 sm:py-8 grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-4 lg:gap-8">
+    <AdminNav current="listings" />
+    <div class="min-w-0">
+      <ListingEditor listingId="" />
+    </div>
+  </div>

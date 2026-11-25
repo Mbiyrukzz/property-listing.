@@ -24,7 +24,8 @@
     "@tylix/mail": "^2.1.1",
     "tylix-icons": "^2.1.1",
     "@tylix/auth": "^2.1.1",
-    "@tylix/pwa": "^2.1.1"
+    "@tylix/pwa": "^2.1.1",
+    "@tylix/permissions": "^2.1.1"
   },
   "devDependencies": {
     "tailwindcss": "^3.4.0",

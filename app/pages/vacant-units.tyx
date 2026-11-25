@@ -1,0 +1,152 @@
+page VacantUnits
+
+import { IconSearch, IconMapPin, IconBed, IconHome, IconRefresh, IconChevronLeft, IconChevronRight } from "tylix-icons"
+
+title "Vacant units to rent today | Barani Better Homes"
+
+uses
+  Site
+  Fmt
+
+state
+  q: ""
+  category: ""
+  max: ""
+  beds: ""
+  page: 1
+  units: []
+  total: 0
+  totalPages: 1
+  loading: true
+  failed: false
+
+computed
+  residential() {
+    return Site.categories.filter(c => c.group is "residential")
+  }
+
+action
+  async load() {
+    this.loading = true
+    this.failed = false
+    const p = new URLSearchParams()
+    if this.q.trim() {
+      p.set("q", this.q.trim())
+    }
+    if this.category {
+      p.set("category", this.category)
+    }
+    if this.max {
+      p.set("max", String(this.max))
+    }
+    if this.beds is not "" {
+      p.set("beds", String(this.beds))
+    }
+    if this.page > 1 {
+      p.set("page", String(this.page))
+    }
+    const result = await useApi("/api/listings/vacant-units?" + p.toString())
+    if result.ok {
+      this.units = result.data.data
+      this.total = result.data.meta.total
+      this.totalPages = result.data.meta.totalPages
+    } else {
+      this.failed = true
+    }
+    this.loading = false
+  }
+
+  apply() {
+    this.page = 1
+    this.load()
+  }
+
+  goTo(n) {
+    this.page = Math.min(Math.max(1, n), this.totalPages)
+    this.load()
+    window.scrollTo({ top: 0, behavior: "smooth" })
+  }
+
+onMount
+  async {
+    const p = new URLSearchParams(window.location.search)
+    this.q = p.get("q") ?? ""
+    await this.load()
+  }
+
+template
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+    <p class="tx-eyebrow mb-2 inline-flex items-center gap-1.5"><IconRefresh class="w-3.5 h-3.5" /> Updated automatically</p>
+    <h1 class="text-[1.75rem] leading-tight sm:text-3xl font-bold tracking-tight">Vacant units</h1>
+    <p class="text-muted mt-2 max-w-2xl mb-6">Every unit here is empty today. Units drop off this list on their own when a tenant moves in, so there's no chasing listings that went months ago.</p>
+
+    <form onsubmit.prevent="{{ apply() }}" class="tx-panel p-3 sm:p-4 mb-6 grid grid-cols-2 md:grid-cols-[1fr_180px_160px_140px_auto] gap-2 items-end" role="search" aria-label="Filter vacant units">
+      <div class="col-span-2 md:col-span-1">
+        <label class="tx-label" for="vu-q">Area or building</label>
+        <input id="vu-q" class="tx-input !mb-0" placeholder="e.g. Vipingo" bind:value="{{ q }}" />
+      </div>
+      <div>
+        <label class="tx-label" for="vu-type">Type</label>
+        <select id="vu-type" class="tx-input !mb-0" bind:value="{{ category }}">
+          <option value="">Any</option>
+{{#each c in residential}}
+          <option value="{{ c.key }}">{{ c.label }}</option>
+{{/each}}
+        </select>
+      </div>
+      <div>
+        <label class="tx-label" for="vu-max">Max rent (KES)</label>
+        <input id="vu-max" class="tx-input !mb-0" type="number" min="0" step="1000" inputmode="numeric" bind:value="{{ max }}" />
+      </div>
+      <div>
+        <label class="tx-label" for="vu-beds">Bedrooms</label>
+        <select id="vu-beds" class="tx-input !mb-0" bind:value="{{ beds }}">
+          <option value="">Any</option>
+          <option value="0">Bedsitter +</option>
+          <option value="1">1+</option>
+          <option value="2">2+</option>
+          <option value="3">3+</option>
+        </select>
+      </div>
+      <button type="submit" class="tx-btn tx-btn-primary justify-center col-span-2 md:col-span-1"><IconSearch class="w-4 h-4" /> Search</button>
+    </form>
+
+    <p class="text-sm text-muted mb-4" aria-live="polite">{{ loading ? "Searching…" : total + (total is 1 ? " vacant unit" : " vacant units") }}</p>
+
+{{#if failed}}
+    <div class="tx-alert tx-alert-error"><p class="text-sm">Vacant units couldn't be loaded. <button class="underline" onclick="{{ load() }}">Try again</button></p></div>
+{{#else if not loading and units.length is 0}}
+    <div class="rounded-xl border border-dashed border-line-strong p-10 text-center">
+      <h2 class="font-semibold mb-1">No vacant units match</h2>
+      <p class="text-sm text-muted mb-4">Try a higher rent or another area, or leave your details and we'll call when one opens up.</p>
+      <a href="/contact" class="tx-btn tx-btn-outline tx-btn-sm">Leave my details</a>
+    </div>
+{{#else}}
+    <div class="{{ 'grid grid-cols-1 md:grid-cols-2 gap-3 ' + (loading ? 'opacity-60' : '') }}">
+{{#each u in units}}
+      <a href="{{ `/properties/${u.listing.slug}` }}" class="tx-panel p-3 flex gap-4 hover:border-line-strong">
+        <div class="w-28 h-24 sm:w-36 sm:h-28 rounded-lg overflow-hidden bg-well shrink-0">
+{{#if u.cover}}
+          <img src="{{ u.cover }}" alt="" class="w-full h-full object-cover" loading="lazy" />
+{{#else}}
+          <div class="bb-photo-empty"><IconHome class="w-7 h-7" /></div>
+{{/if}}
+        </div>
+        <div class="min-w-0 flex flex-col gap-1">
+          <p class="font-semibold">{{ Fmt.price(u.rent, "rent") }}</p>
+          <p class="text-sm font-medium truncate">{{ u.listing.title }} · {{ u.name }}</p>
+          <p class="text-sm text-soft flex items-center gap-1.5"><IconBed class="w-4 h-4 text-muted" /> {{ u.type }}{{ u.isFurnished ? " · furnished" : "" }}</p>
+          <p class="text-xs text-muted flex items-center gap-1"><IconMapPin class="w-3.5 h-3.5" /> {{ u.listing.location }}</p>
+        </div>
+      </a>
+{{/each}}
+    </div>
+{{#if totalPages > 1}}
+    <nav class="flex items-center justify-center gap-3 mt-8" aria-label="Pages">
+      <button class="tx-btn tx-btn-outline tx-btn-sm" disabled="{{ page <= 1 }}" onclick="{{ goTo(page - 1) }}"><IconChevronLeft class="w-4 h-4" /> Previous</button>
+      <span class="text-sm text-muted">Page {{ page }} of {{ totalPages }}</span>
+      <button class="tx-btn tx-btn-outline tx-btn-sm" disabled="{{ page >= totalPages }}" onclick="{{ goTo(page + 1) }}">Next <IconChevronRight class="w-4 h-4" /></button>
+    </nav>
+{{/if}}
+{{/if}}
+  </div>

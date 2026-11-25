@@ -1,0 +1,8 @@
+page Properties
+
+import ListingBrowser from "../components/ListingBrowser"
+
+title "Properties | Barani Better Homes"
+
+template
+  <ListingBrowser heading="All properties" intro="Homes, land and commercial space to rent or buy." fixedPurpose="" fixedGroup="" />

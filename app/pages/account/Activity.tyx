@@ -1,0 +1,153 @@
+page AccountActivity
+
+import AccountNav from "../components/AccountNav"
+
+title "Enquiries & applications | Barani Better Homes"
+
+needs
+  Auth
+
+uses
+  Fmt
+
+state
+  tab: "applications"
+  enquiries: []
+  viewings: []
+  applications: []
+  loading: true
+  message: ""
+  busyId: null
+
+action
+  chip(status) {
+    if status is "approved" or status is "confirmed" or status is "completed" {
+      return "bb-chip bb-chip-ok"
+    }
+    if status is "rejected" or status is "cancelled" or status is "withdrawn" {
+      return "bb-chip bb-chip-bad"
+    }
+    if status is "closed" or status is "contacted" {
+      return "bb-chip bb-chip-muted"
+    }
+    return "bb-chip bb-chip-warn"
+  }
+
+  tabClass(key) {
+    return "text-sm px-3 py-1.5 rounded-md " + (this.tab is key ? "bg-panel shadow font-semibold text-ink" : "text-muted")
+  }
+
+  async load() {
+    const result = await useApi("/api/account/activity")
+    if result.ok {
+      this.enquiries = result.data.enquiries
+      this.viewings = result.data.viewings
+      this.applications = result.data.applications
+    }
+    this.loading = false
+  }
+
+  async cancelViewing(v) {
+    if not confirm("Cancel this viewing?") {
+      return null
+    }
+    this.busyId = "v" + v.id
+    const result = await useApi(`/api/account/viewings/${v.id}/cancel`, { method: "PUT" })
+    this.busyId = null
+    this.message = result.ok ? "Viewing cancelled." : Fmt.firstError(result)
+    await this.load()
+  }
+
+  async withdraw(a) {
+    if not confirm("Withdraw this application?") {
+      return null
+    }
+    this.busyId = "a" + a.id
+    const result = await useApi(`/api/account/applications/${a.id}/withdraw`, { method: "PUT" })
+    this.busyId = null
+    this.message = result.ok ? "Application withdrawn." : Fmt.firstError(result)
+    await this.load()
+  }
+
+onMount
+  async {
+    if not Auth.user {
+      window.location.href = "/login?next=/account/activity"
+      return null
+    }
+    await this.load()
+    if this.applications.length is 0 {
+      this.tab = this.viewings.length > 0 ? "viewings" : "enquiries"
+    }
+  }
+
+template
+{{#if Auth.user}}
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-5 sm:py-8 grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-4 lg:gap-8">
+    <AccountNav current="activity" />
+    <div class="min-w-0">
+      <h1 class="text-2xl font-bold tracking-tight mb-6">Enquiries & applications</h1>
+
+      <div class="inline-flex gap-1 p-1 rounded-lg bg-raised mb-5" role="tablist">
+        <button role="tab" aria-selected="{{ tab is 'applications' }}" class="{{ tabClass('applications') }}" onclick="{{ tab = 'applications' }}">Applications ({{ applications.length }})</button>
+        <button role="tab" aria-selected="{{ tab is 'viewings' }}" class="{{ tabClass('viewings') }}" onclick="{{ tab = 'viewings' }}">Viewings ({{ viewings.length }})</button>
+        <button role="tab" aria-selected="{{ tab is 'enquiries' }}" class="{{ tabClass('enquiries') }}" onclick="{{ tab = 'enquiries' }}">Enquiries ({{ enquiries.length }})</button>
+      </div>
+
+{{#if message}}
+      <div class="tx-alert tx-alert-info mb-4" role="status"><p class="text-sm">{{ message }}</p></div>
+{{/if}}
+
+{{#if loading}}
+      <p class="text-sm text-muted">Loading…</p>
+{{#else if tab is "applications"}}
+{{#each a in applications}}
+      <div class="tx-panel p-4 mb-3 flex flex-wrap items-start justify-between gap-3">
+        <div class="min-w-0">
+          <p class="font-medium">{{ a.kind is "purchase" ? "Offer" : "Rental application" }}{{ a.listing ? " · " + a.listing.title : "" }}{{ a.unit ? " (" + a.unit + ")" : "" }}</p>
+          <p class="text-xs text-muted mt-1">Sent {{ Fmt.date(a.createdAt) }}{{ a.offerAmount ? " · offer " + Fmt.kes(a.offerAmount) : "" }}{{ a.moveInDate ? " · move-in " + Fmt.date(a.moveInDate) : "" }}</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="{{ chip(a.status) }}">{{ Fmt.label(a.status) }}</span>
+{{#if a.status is "submitted" or a.status is "reviewing"}}
+          <button class="tx-btn tx-btn-ghost tx-btn-sm" disabled="{{ busyId is 'a' + a.id }}" onclick="{{ withdraw(a) }}">Withdraw</button>
+{{/if}}
+        </div>
+      </div>
+{{#else}}
+      <p class="text-sm text-muted">No applications yet. Apply from any listing page.</p>
+{{/each}}
+{{#else if tab is "viewings"}}
+{{#each v in viewings}}
+      <div class="tx-panel p-4 mb-3 flex flex-wrap items-start justify-between gap-3">
+        <div class="min-w-0">
+          <p class="font-medium">{{ v.listing ? v.listing.title : "Viewing" }}{{ v.unit ? " (" + v.unit + ")" : "" }}</p>
+          <p class="text-xs text-muted mt-1">{{ v.scheduledFor ? "Confirmed for " + Fmt.dateTime(v.scheduledFor) : "Asked for " + Fmt.date(v.preferredDate) + ", " + v.preferredTime }}</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="{{ chip(v.status) }}">{{ Fmt.label(v.status) }}</span>
+{{#if v.status is "requested" or v.status is "confirmed"}}
+          <button class="tx-btn tx-btn-ghost tx-btn-sm" disabled="{{ busyId is 'v' + v.id }}" onclick="{{ cancelViewing(v) }}">Cancel</button>
+{{/if}}
+        </div>
+      </div>
+{{#else}}
+      <p class="text-sm text-muted">No viewings booked. Use "Book a viewing" on any listing.</p>
+{{/each}}
+{{#else}}
+{{#each e in enquiries}}
+      <div class="tx-panel p-4 mb-3">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <p class="font-medium">{{ e.listing ? e.listing.title : "General enquiry" }}{{ e.unit ? " (" + e.unit + ")" : "" }}</p>
+          <span class="{{ chip(e.status) }}">{{ Fmt.label(e.status) }}</span>
+        </div>
+        <p class="text-sm text-soft mt-2 line-clamp-3">{{ e.message }}</p>
+        <p class="text-xs text-muted mt-2">{{ Fmt.date(e.createdAt) }}</p>
+      </div>
+{{#else}}
+      <p class="text-sm text-muted">No enquiries yet.</p>
+{{/each}}
+{{/if}}
+    </div>
+  </div>
+{{/if}}

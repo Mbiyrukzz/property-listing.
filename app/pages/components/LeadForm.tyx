@@ -1,0 +1,192 @@
+component LeadForm
+
+import { IconCheckCircle } from "tylix-icons"
+
+props
+  listingId: any
+  units: any
+  purpose: string
+  defaultMessage: string
+
+uses
+  Auth
+  Fmt
+
+state
+  mode: "enquiry"
+  name: ""
+  email: ""
+  phone: ""
+  message: ""
+  unitId: ""
+  preferredDate: ""
+  preferredTime: "morning"
+  notes: ""
+  sending: false
+  errors: {}
+  formError: ""
+  done: ""
+  prefilled: false
+  today: ""
+
+computed
+  canBook() {
+    return Boolean(this.listingId)
+  }
+
+  unitList() {
+    return Array.isArray(this.units) ? this.units : []
+  }
+
+action
+  prefill() {
+    if this.prefilled or not Auth.user {
+      return null
+    }
+    this.name = this.name or Auth.user.name or ""
+    this.email = this.email or Auth.user.email or ""
+    this.prefilled = true
+  }
+
+  fieldError(field) {
+    const list = this.errors[field]
+    return Array.isArray(list) and list.length > 0 ? list[0] : ""
+  }
+
+  setMode(value) {
+    this.mode = value
+    this.errors = {}
+    this.formError = ""
+    this.done = ""
+  }
+
+  async submit() {
+    if this.sending {
+      return null
+    }
+    this.sending = true
+    this.errors = {}
+    this.formError = ""
+
+    const base = Auth.user ? "/api/account/" : "/api/"
+    const unit = this.unitId ? Number(this.unitId) : null
+    const listing = this.listingId ? Number(this.listingId) : null
+    let result
+
+    if this.mode is "viewing" {
+      result = await useApi(base + "viewings", {
+        method: "POST",
+        body: {
+          property_id: listing, unit_id: unit, name: this.name, email: this.email, phone: this.phone,
+          preferred_date: this.preferredDate, preferred_time: this.preferredTime, notes: this.notes
+        }
+      })
+    } else {
+      result = await useApi(base + "enquiries", {
+        method: "POST",
+        body: {
+          kind: listing ? (this.purpose is "sale" ? "purchase" : "rental") : "general",
+          property_id: listing, unit_id: unit, name: this.name, email: this.email, phone: this.phone,
+          message: this.message or this.defaultMessage
+        }
+      })
+    }
+
+    this.sending = false
+    if result.ok {
+      this.done = result.data.message
+      this.message = ""
+      this.notes = ""
+      return null
+    }
+    if result.status is 422 and result.data?.errors {
+      this.errors = result.data.errors
+      return null
+    }
+    this.formError = Fmt.firstError(result, "We couldn't send that. Check your connection and try again.")
+  }
+
+onMount
+  {
+    const d = new Date()
+    this.today = d.toISOString().slice(0, 10)
+    const tomorrow = new Date(d.getTime() + 86400000)
+    this.preferredDate = tomorrow.toISOString().slice(0, 10)
+    this.prefill()
+  }
+
+template
+  <div class="tx-panel p-5" onfocusin="{{ prefill() }}">
+{{#if canBook}}
+    <div class="grid grid-cols-2 gap-1 p-1 rounded-lg bg-raised mb-5" role="tablist">
+      <button role="tab" aria-selected="{{ mode is 'enquiry' }}" onclick="{{ setMode('enquiry') }}" class="{{ 'text-sm py-1.5 rounded-md ' + (mode is 'enquiry' ? 'bg-panel shadow font-semibold text-ink' : 'text-muted') }}">Ask a question</button>
+      <button role="tab" aria-selected="{{ mode is 'viewing' }}" onclick="{{ setMode('viewing') }}" class="{{ 'text-sm py-1.5 rounded-md ' + (mode is 'viewing' ? 'bg-panel shadow font-semibold text-ink' : 'text-muted') }}">Book a viewing</button>
+    </div>
+{{/if}}
+
+{{#if done}}
+    <div class="text-center py-6" role="status">
+      <IconCheckCircle class="w-10 h-10 text-mint mx-auto mb-3" />
+      <p class="font-semibold mb-1">Sent</p>
+      <p class="text-sm text-muted mb-4">{{ done }}</p>
+      <button class="tx-btn tx-btn-outline tx-btn-sm" onclick="{{ setMode(mode) }}">Send another</button>
+    </div>
+{{#else}}
+    <form onsubmit.prevent="{{ submit() }}" novalidate>
+{{#if formError}}
+      <div role="alert" class="tx-alert tx-alert-error mb-4"><p class="text-sm">{{ formError }}</p></div>
+{{/if}}
+
+      <label class="tx-label" for="lead-name">Your name</label>
+      <input id="lead-name" class="tx-input" autocomplete="name" bind:value="{{ name }}" aria-invalid="{{ fieldError('name') ? 'true' : 'false' }}" />
+{{#if fieldError("name")}}<p class="text-xs text-coral -mt-3 mb-3">{{ fieldError("name") }}</p>{{/if}}
+
+      <label class="tx-label" for="lead-phone">Phone</label>
+      <input id="lead-phone" class="tx-input" type="tel" autocomplete="tel" placeholder="0712 345 678" bind:value="{{ phone }}" aria-invalid="{{ fieldError('phone') ? 'true' : 'false' }}" />
+{{#if fieldError("phone")}}<p class="text-xs text-coral -mt-3 mb-3">{{ fieldError("phone") }}</p>{{/if}}
+
+      <label class="tx-label" for="lead-email">Email <span class="text-muted font-normal">(optional)</span></label>
+      <input id="lead-email" class="tx-input" type="email" autocomplete="email" bind:value="{{ email }}" aria-invalid="{{ fieldError('email') ? 'true' : 'false' }}" />
+{{#if fieldError("email")}}<p class="text-xs text-coral -mt-3 mb-3">{{ fieldError("email") }}</p>{{/if}}
+
+{{#if unitList.length > 0}}
+      <label class="tx-label" for="lead-unit">Unit</label>
+      <select id="lead-unit" class="tx-input" bind:value="{{ unitId }}">
+        <option value="">Any vacant unit</option>
+{{#each u in unitList}}
+        <option value="{{ u.id }}">{{ u.name }} · {{ u.type }} · {{ Fmt.kes(u.rent) }}</option>
+{{/each}}
+      </select>
+{{/if}}
+
+{{#if mode is "viewing"}}
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="tx-label" for="lead-date">Day</label>
+          <input id="lead-date" class="tx-input" type="date" min="{{ today }}" bind:value="{{ preferredDate }}" aria-invalid="{{ fieldError('preferred_date') ? 'true' : 'false' }}" />
+        </div>
+        <div>
+          <label class="tx-label" for="lead-time">Time</label>
+          <select id="lead-time" class="tx-input" bind:value="{{ preferredTime }}">
+            <option value="morning">Morning</option>
+            <option value="afternoon">Afternoon</option>
+            <option value="evening">Evening</option>
+          </select>
+        </div>
+      </div>
+{{#if fieldError("preferred_date")}}<p class="text-xs text-coral -mt-3 mb-3">{{ fieldError("preferred_date") }}</p>{{/if}}
+      <label class="tx-label" for="lead-notes">Anything we should know? <span class="text-muted font-normal">(optional)</span></label>
+      <textarea id="lead-notes" class="tx-input" rows="2" bind:value="{{ notes }}"></textarea>
+{{#else}}
+      <label class="tx-label" for="lead-message">Message</label>
+      <textarea id="lead-message" class="tx-input" rows="4" placeholder="{{ defaultMessage or 'How can we help?' }}" bind:value="{{ message }}" aria-invalid="{{ fieldError('message') ? 'true' : 'false' }}"></textarea>
+{{#if fieldError("message")}}<p class="text-xs text-coral -mt-3 mb-3">{{ fieldError("message") }}</p>{{/if}}
+{{/if}}
+
+      <button type="submit" class="tx-btn tx-btn-primary tx-btn-block" disabled="{{ sending }}">
+        {{ sending ? "Sending…" : (mode is "viewing" ? "Request viewing" : "Send enquiry") }}
+      </button>
+      <p class="text-xs text-muted mt-3">We reply by phone or WhatsApp, usually the same working day.</p>
+    </form>
+{{/if}}
+  </div>

@@ -1,0 +1,8 @@
+page Buy
+
+import ListingBrowser from "./components/ListingBrowser"
+
+title "Property for sale | Barani Better Homes"
+
+template
+  <ListingBrowser heading="Property for sale" intro="Houses, maisonettes, land and commercial buildings for sale." fixedPurpose="sale" fixedGroup="" />

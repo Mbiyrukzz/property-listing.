@@ -4,6 +4,7 @@
 // (light values on :root, dark values on .dark), so `bg-panel` or
 // `text-muted` is right in both themes without a dark: variant.
 const token = (name) => `rgb(var(--tx-${name}) / <alpha-value>)`;
+const bb = (name) => `rgb(var(--bb-${name}) / <alpha-value>)`;
 
 export default {
   darkMode: "class",
@@ -19,13 +20,19 @@ export default {
         ink: token("ink"),
         soft: token("soft"),
         muted: token("muted"),
-        brand: { DEFAULT: token("brand"), hover: token("brand-hover"), deep: "#0034CA" },
+        brand: { DEFAULT: token("brand"), hover: token("brand-hover") },
         link: token("link"),
         mint: token("mint"),
         coral: token("coral"),
         peach: token("peach"),
         signal: token("signal"),
         aqua: token("aqua"),
+        night: { DEFAULT: bb("night"), 2: bb("night-2") },
+        lilac: bb("lilac"),
+        blush: bb("blush"),
+        apricot: bb("apricot"),
+        butter: bb("butter"),
+        leaf: bb("leaf"),
       },
       fontFamily: {
         sans: "var(--tx-font)",

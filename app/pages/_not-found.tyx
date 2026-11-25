@@ -1,11 +1,17 @@
 page NotFound
 
+import { IconMapPin } from "tylix-icons"
+
 title "Page not found"
 
 template
-  <main class="min-h-[70vh] flex flex-col items-center justify-center text-center px-6">
-    <p class="font-mono text-6xl font-semibold tracking-tight tx-gradient-text mb-3">404</p>
-    <h1 class="mt-2 text-3xl font-semibold text-ink">Page not found</h1>
-    <p class="mt-3 text-muted">The page you're looking for doesn't exist.</p>
-    <a href="/" class="mt-6 px-5 py-2 rounded-full bg-gradient-to-r from-brand to-aqua text-white font-semibold">Go home</a>
+  <main class="min-h-[70vh] flex flex-col items-center justify-center text-center px-6 py-16">
+    <span class="bb-icon-tile bb-tint-lilac w-16 h-16 rounded-3xl mb-6"><IconMapPin class="w-7 h-7" /></span>
+    <p class="tx-eyebrow mb-3">Error 404</p>
+    <h1 class="text-3xl sm:text-4xl font-bold tracking-tight text-ink">This address is off the map</h1>
+    <p class="mt-3 text-muted max-w-md">The page you're looking for doesn't exist or has moved. Try a search instead.</p>
+    <div class="mt-7 flex flex-wrap justify-center gap-2">
+      <a href="/" class="tx-btn tx-btn-primary">Go home</a>
+      <a href="/properties" class="tx-btn tx-btn-outline">Browse properties</a>
+    </div>
   </main>

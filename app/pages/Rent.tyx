@@ -1,0 +1,8 @@
+page Rent
+
+import ListingBrowser from "./components/ListingBrowser"
+
+title "Houses and apartments to rent | Barani Better Homes"
+
+template
+  <ListingBrowser heading="Property to rent" intro="Apartments, houses, offices and shops available to let. Rental availability updates from the landlord's records automatically." fixedPurpose="rent" fixedGroup="" />

@@ -1,0 +1,41 @@
+capability Site
+
+state
+  settings: {
+    site_name: "Barani Better Homes",
+    tagline: "",
+    hero_title: "Find your next home, plot or office",
+    hero_subtitle: "",
+    phone: "",
+    whatsapp: "+254 786 514182",
+    email: "info@baranibetterhomes.com",
+    address: "",
+    office_hours: "",
+    facebook: "",
+    instagram: "",
+    about_short: ""
+  }
+  pages: []
+  categories: []
+  loaded: false
+
+action
+  categoryLabel(key) {
+    const found = this.categories.find(c => c.key is key)
+    return found ? found.label : "Property"
+  }
+
+  async reload() {
+    const result = await useApi("/api/site")
+    if result.ok {
+      this.settings = { ...this.settings, ...result.data.settings }
+      this.pages = result.data.pages
+      this.categories = result.data.categories
+    }
+    this.loaded = true
+  }
+
+init
+  async {
+    await this.reload()
+  }

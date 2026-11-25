@@ -1,0 +1,246 @@
+page AdminReports
+
+import AdminNav from "../components/AdminNav"
+
+title "Reports | Barani Better Homes admin"
+
+needs
+  Auth
+
+permissions
+  reports.view
+
+uses
+  Fmt
+
+state
+  days: 30
+  loading: true
+  loadError: ""
+  report: null
+  hoverEnq: -1
+  hoverViews: -1
+  showTables: false
+
+computed
+  // Over 90 days, one bar per week keeps the bars readable.
+  enquiryBars() {
+    return this.report ? this.bucket(this.report.enquiriesPerDay) : []
+  }
+
+  viewBars() {
+    return this.report ? this.bucket(this.report.viewsPerDay) : []
+  }
+
+  enquiryMax() {
+    return Math.max(1, ...this.enquiryBars.map(b => b.count))
+  }
+
+  viewMax() {
+    return Math.max(1, ...this.viewBars.map(b => b.count))
+  }
+
+  conversion() {
+    if not this.report or this.report.totals.views is 0 {
+      return "—"
+    }
+    return (this.report.totals.enquiries / this.report.totals.views * 100).toFixed(1) + "%"
+  }
+
+action
+  bucket(series) {
+    if series.length <= 90 {
+      return series.map(p => ({ label: Fmt.date(p.date), count: p.count }))
+    }
+    return Array.from({ length: Math.ceil(series.length / 7) }, (_, w) => {
+      const week = series.slice(w * 7, w * 7 + 7)
+      return { label: "Week of " + Fmt.date(week[0].date), count: week.reduce((n, p) => n + p.count, 0) }
+    })
+  }
+
+  breakdown(map) {
+    const rows = Object.keys(map ?? {}).map(k => ({ key: k, count: Number(map[k]) }))
+    rows.sort((a, b) => b.count - a.count)
+    return rows
+  }
+
+  breakdownMax(map) {
+    return Math.max(1, ...this.breakdown(map).map(r => r.count))
+  }
+
+  barHeight(count, max) {
+    return "height: " + Math.max(count > 0 ? 3 : 0, Math.round(count / max * 100)) + "%"
+  }
+
+  barWidth(count, max) {
+    return "width: " + Math.max(count > 0 ? 2 : 0, Math.round(count / max * 100)) + "%"
+  }
+
+  async load(days) {
+    this.days = days
+    this.loadError = ""
+    const result = await useApi("/api/admin/reports?days=" + days)
+    if result.ok {
+      this.report = result.data
+    } else {
+      this.loadError = Fmt.firstError(result)
+    }
+    this.loading = false
+  }
+
+  rangeClass(d) {
+    return "text-sm px-3 py-1.5 rounded-md " + (this.days is d ? "bg-panel shadow font-semibold text-ink" : "text-muted")
+  }
+
+onMount
+  async {
+    await this.load(30)
+  }
+
+template
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-5 sm:py-8 grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-4 lg:gap-8">
+    <AdminNav current="reports" />
+
+    <div class="min-w-0">
+      <div class="flex flex-wrap items-end justify-between gap-3 mb-6">
+        <div>
+          <h1 class="text-2xl font-bold tracking-tight">Reports</h1>
+          <p class="text-sm text-muted mt-1">Visitor interest and lead handling. Rent collection is reported in HQ.</p>
+        </div>
+        <div class="inline-flex gap-1 p-1 rounded-lg bg-raised" role="group" aria-label="Time range">
+          <button class="{{ rangeClass(7) }}" aria-pressed="{{ days is 7 }}" onclick="{{ load(7) }}">7 days</button>
+          <button class="{{ rangeClass(30) }}" aria-pressed="{{ days is 30 }}" onclick="{{ load(30) }}">30 days</button>
+          <button class="{{ rangeClass(90) }}" aria-pressed="{{ days is 90 }}" onclick="{{ load(90) }}">90 days</button>
+          <button class="{{ rangeClass(365) }}" aria-pressed="{{ days is 365 }}" onclick="{{ load(365) }}">Year</button>
+        </div>
+      </div>
+
+{{#if loadError}}<div class="tx-alert tx-alert-error mb-4" role="alert"><p class="text-sm">{{ loadError }}</p></div>{{/if}}
+
+{{#if loading}}
+      <div data-page-loader="true" class="text-sm text-muted">Loading…</div>
+{{#else if report}}
+      <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
+        <div class="tx-panel p-4"><p class="text-2xl font-semibold">{{ report.totals.views }}</p><p class="text-xs text-muted">Listing views</p></div>
+        <div class="tx-panel p-4"><p class="text-2xl font-semibold">{{ report.totals.enquiries }}</p><p class="text-xs text-muted">Enquiries</p></div>
+        <div class="tx-panel p-4"><p class="text-2xl font-semibold">{{ conversion }}</p><p class="text-xs text-muted">Enquiries per view</p></div>
+        <div class="tx-panel p-4"><p class="text-2xl font-semibold">{{ report.totals.viewings }}</p><p class="text-xs text-muted">Viewing requests</p></div>
+        <div class="tx-panel p-4"><p class="text-2xl font-semibold">{{ report.totals.applications }}</p><p class="text-xs text-muted">Applications · {{ report.totals.approved }} approved</p></div>
+        <div class="tx-panel p-4"><p class="text-2xl font-semibold">{{ report.totals.newCustomers }}</p><p class="text-xs text-muted">New accounts</p></div>
+      </div>
+
+      <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
+        <section class="tx-panel p-5" aria-labelledby="rep-views">
+          <div class="flex items-baseline justify-between gap-3 mb-1">
+            <h2 id="rep-views" class="font-semibold">Listing views</h2>
+            <p class="text-xs text-muted">{{ days > 90 ? "per week" : "per day" }}</p>
+          </div>
+          <p class="text-sm text-soft h-5 mb-3" aria-live="polite">{{ hoverViews >= 0 ? viewBars[hoverViews].label + ": " + viewBars[hoverViews].count + " views" : "Peak " + viewMax + (viewMax is 1 ? " view" : " views") }}</p>
+          <div class="bb-bars" role="img" aria-label="Listing views {{ days > 90 ? 'per week' : 'per day' }}, last {{ days }} days. Total {{ report.totals.views }}." onmouseleave="{{ hoverViews = -1 }}">
+{{#each b, i in viewBars}}
+            <div class="bb-bar-slot" onmouseenter="{{ hoverViews = i }}" title="{{ b.label }}: {{ b.count }}"><div class="bb-bar {{ hoverViews is i ? 'is-hover' : '' }}" style="{{ barHeight(b.count, viewMax) }}"></div></div>
+{{/each}}
+          </div>
+          <div class="flex justify-between text-xs text-muted mt-2"><span>{{ viewBars.length ? viewBars[0].label : "" }}</span><span>{{ viewBars.length ? viewBars[viewBars.length - 1].label : "" }}</span></div>
+        </section>
+
+        <section class="tx-panel p-5" aria-labelledby="rep-enq">
+          <div class="flex items-baseline justify-between gap-3 mb-1">
+            <h2 id="rep-enq" class="font-semibold">Enquiries</h2>
+            <p class="text-xs text-muted">{{ days > 90 ? "per week" : "per day" }}</p>
+          </div>
+          <p class="text-sm text-soft h-5 mb-3" aria-live="polite">{{ hoverEnq >= 0 ? enquiryBars[hoverEnq].label + ": " + enquiryBars[hoverEnq].count + (enquiryBars[hoverEnq].count is 1 ? " enquiry" : " enquiries") : "Peak " + enquiryMax + (enquiryMax is 1 ? " enquiry" : " enquiries") }}</p>
+          <div class="bb-bars" role="img" aria-label="Enquiries {{ days > 90 ? 'per week' : 'per day' }}, last {{ days }} days. Total {{ report.totals.enquiries }}." onmouseleave="{{ hoverEnq = -1 }}">
+{{#each b, i in enquiryBars}}
+            <div class="bb-bar-slot" onmouseenter="{{ hoverEnq = i }}" title="{{ b.label }}: {{ b.count }}"><div class="bb-bar {{ hoverEnq is i ? 'is-hover' : '' }}" style="{{ barHeight(b.count, enquiryMax) }}"></div></div>
+{{/each}}
+          </div>
+          <div class="flex justify-between text-xs text-muted mt-2"><span>{{ enquiryBars.length ? enquiryBars[0].label : "" }}</span><span>{{ enquiryBars.length ? enquiryBars[enquiryBars.length - 1].label : "" }}</span></div>
+        </section>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <section class="tx-panel p-5">
+          <h2 class="font-semibold mb-4">Enquiries by kind</h2>
+{{#each r in breakdown(report.enquiriesByKind)}}
+          <div class="mb-3">
+            <div class="flex justify-between text-sm mb-1"><span>{{ Fmt.label(r.key) }}</span><span class="font-medium">{{ r.count }}</span></div>
+            <div class="bb-hbar-track"><div class="bb-hbar" style="{{ barWidth(r.count, breakdownMax(report.enquiriesByKind)) }}"></div></div>
+          </div>
+{{#else}}
+          <p class="text-sm text-muted">None in this period.</p>
+{{/each}}
+        </section>
+        <section class="tx-panel p-5">
+          <h2 class="font-semibold mb-4">Viewings by status</h2>
+{{#each r in breakdown(report.viewingsByStatus)}}
+          <div class="mb-3">
+            <div class="flex justify-between text-sm mb-1"><span>{{ Fmt.label(r.key) }}</span><span class="font-medium">{{ r.count }}</span></div>
+            <div class="bb-hbar-track"><div class="bb-hbar" style="{{ barWidth(r.count, breakdownMax(report.viewingsByStatus)) }}"></div></div>
+          </div>
+{{#else}}
+          <p class="text-sm text-muted">None in this period.</p>
+{{/each}}
+        </section>
+        <section class="tx-panel p-5">
+          <h2 class="font-semibold mb-4">Applications by status</h2>
+{{#each r in breakdown(report.applicationsByStatus)}}
+          <div class="mb-3">
+            <div class="flex justify-between text-sm mb-1"><span>{{ Fmt.label(r.key) }}</span><span class="font-medium">{{ r.count }}</span></div>
+            <div class="bb-hbar-track"><div class="bb-hbar" style="{{ barWidth(r.count, breakdownMax(report.applicationsByStatus)) }}"></div></div>
+          </div>
+{{#else}}
+          <p class="text-sm text-muted">None in this period.</p>
+{{/each}}
+        </section>
+      </div>
+
+      <div class="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-6 items-start mb-6">
+        <section class="tx-panel overflow-x-auto">
+          <h2 class="font-semibold p-4 pb-2">Most viewed listings</h2>
+{{#if report.topListings.length is 0}}
+          <p class="px-4 pb-4 text-sm text-muted">No views recorded in this period.</p>
+{{#else}}
+          <table class="bb-table">
+            <thead><tr><th>Listing</th><th class="text-right">Views</th><th class="text-right">Enquiries</th></tr></thead>
+            <tbody>
+{{#each t in report.topListings}}
+              <tr><td><a class="tx-link" href="/admin/listings/{{ t.id }}">{{ t.title }}</a></td><td class="text-right tabular-nums">{{ t.views }}</td><td class="text-right tabular-nums">{{ t.enquiries }}</td></tr>
+{{/each}}
+            </tbody>
+          </table>
+{{/if}}
+        </section>
+
+        <section class="tx-panel overflow-x-auto">
+          <h2 class="font-semibold p-4 pb-0">Published inventory</h2>
+          <p class="text-xs text-muted px-4 pb-2">Listings on the site today.</p>
+          <table class="bb-table">
+            <thead><tr><th>Category</th><th class="text-right">Rent</th><th class="text-right">Sale</th></tr></thead>
+            <tbody>
+{{#each c in report.inventory}}
+              <tr><td>{{ c.label }}</td><td class="text-right tabular-nums">{{ c.rent }}</td><td class="text-right tabular-nums">{{ c.sale }}</td></tr>
+{{/each}}
+            </tbody>
+          </table>
+        </section>
+      </div>
+
+      <section class="tx-panel p-4">
+        <button class="text-sm font-medium tx-link" aria-expanded="{{ showTables ? 'true' : 'false' }}" onclick="{{ showTables = not showTables }}">{{ showTables ? "Hide the figures" : (days > 90 ? "Weekly" : "Daily") + " figures as a table" }}</button>
+{{#if showTables}}
+        <div class="overflow-x-auto mt-3 max-h-96">
+          <table class="bb-table">
+            <thead><tr><th>{{ days > 90 ? "Week" : "Day" }}</th><th class="text-right">Views</th><th class="text-right">Enquiries</th></tr></thead>
+            <tbody>
+{{#each b, i in viewBars}}
+              <tr><td>{{ b.label }}</td><td class="text-right tabular-nums">{{ b.count }}</td><td class="text-right tabular-nums">{{ enquiryBars[i] ? enquiryBars[i].count : 0 }}</td></tr>
+{{/each}}
+            </tbody>
+          </table>
+        </div>
+{{/if}}
+      </section>
+{{/if}}
+    </div>
+  </div>

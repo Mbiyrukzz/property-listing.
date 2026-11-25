@@ -1,30 +1,22 @@
 component SiteNavbar
 
-import { IconSun, IconMoon, IconMenu, IconX } from "tylix-icons"
-
-props
-  showPosts: boolean
+import { IconSun, IconMoon, IconMenu, IconX, IconHeart, IconUserCircle, IconLayoutGrid, IconKey, IconHome, IconBuildingOffice, IconTree, IconNewspaper, IconChatBubble, IconLogout, IconTag } from "tylix-icons"
 
 uses
   Auth
   Theme
+  Site
 
 state
   mobileMenuOpen: false
-
-computed
-  links() {
-    const items = []
-    if this.showPosts {
-      items.push({ label: "Posts", href: "/posts" })
-    }
-    if Auth.user {
-      items.push({ label: "Dashboard", href: "/dashboard" })
-    }
-    items.push({ label: "Docs", href: "https://tylix.dev/docs" })
-    items.push({ label: "GitHub", href: "https://github.com/tylixjs" })
-    return items
-  }
+  links: [
+    { label: "Rent", href: "/rent" },
+    { label: "Buy", href: "/buy" },
+    { label: "Vacant units", href: "/vacant-units" },
+    { label: "Land", href: "/land" },
+    { label: "Commercial", href: "/commercial" },
+    { label: "News", href: "/posts" }
+  ]
 
 action
   toggleMobileMenu() {
@@ -37,39 +29,36 @@ action
 
   isActive(href) {
     const path = window.location.pathname
-    return path is href or (href is not "/" and path.startsWith(href + "/"))
+    return path is href or path.startsWith(href + "/")
   }
 
   linkClass(href) {
-    const base = "text-sm px-3.5 py-1.5 rounded-lg transition-colors "
-    if this.isActive(href) {
-      return base + "text-ink bg-raised font-medium tx-nav-link-active"
-    }
-    return base + "text-soft hover:text-ink hover:bg-raised "
+    return this.isActive(href) ? "bb-nav-link is-active" : "bb-nav-link"
+  }
+
+  sheetClass(href) {
+    return this.isActive(href) ? "bb-sheet-link is-active" : "bb-sheet-link"
   }
 
 template
   <header class="tx-nav">
-    <nav class="max-w-6xl mx-auto h-16 px-6 flex items-center justify-between">
-      <div class="flex items-center gap-8">
-        <a href="/" class="flex items-center gap-2.5">
-          <img src="/logo-mark.svg" alt="" class="h-[22px] w-auto" />
-          <span class="text-[17px] font-bold tracking-tight">Tylix</span>
+    <nav class="max-w-7xl mx-auto h-16 px-4 sm:px-6 flex items-center justify-between gap-4" aria-label="Main">
+      <div class="flex items-center gap-8 min-w-0">
+        <a href="/" class="flex items-center gap-2.5 min-w-0" aria-label="{{ Site.settings.site_name }} home">
+          <span class="bb-logo"><img src="/barani-mark.png" alt="" width="97" height="87" /></span>
+          <span class="text-base sm:text-[17px] font-bold tracking-tight truncate">{{ Site.settings.site_name }}</span>
         </a>
 
-        <div class="hidden md:flex items-center gap-1">
+        <div class="hidden lg:flex items-center gap-1">
 {{#each link in links}}
           <a href="{{ link.href }}" class="{{ linkClass(link.href) }}">{{ link.label }}</a>
 {{/each}}
+          <a href="/p/about#landlords" class="hidden xl:inline-flex bb-nav-link">For landlords</a>
         </div>
       </div>
 
-      <div class="flex items-center gap-2">
-        <button
-          onclick="{{ Theme.toggle() }}"
-          aria-label="Toggle color theme"
-          class="tx-icon-btn"
-        >
+      <div class="flex items-center gap-1 shrink-0">
+        <button onclick="{{ Theme.toggle() }}" aria-label="Toggle colour theme" class="tx-icon-btn">
 {{#if Theme.mode is "dark"}}
           <IconSun class="w-[18px] h-[18px]" />
 {{#else}}
@@ -78,10 +67,14 @@ template
         </button>
 
 {{#if Auth.user}}
-        <button onclick="{{ Auth.logout() }}" class="hidden sm:inline-flex text-sm px-3.5 py-1.5 rounded-lg border border-line text-soft hover:bg-raised transition-colors">Log out</button>
+        <a href="/account/saved" class="tx-icon-btn" aria-label="Saved properties"><IconHeart class="w-[18px] h-[18px]" /></a>
+{{#if can("admin.access")}}
+        <a href="/admin" class="hidden md:inline-flex bb-nav-link gap-1.5"><IconLayoutGrid class="w-4 h-4" /> Admin</a>
+{{/if}}
+        <a href="/dashboard" class="hidden sm:inline-flex tx-btn tx-btn-dark tx-btn-sm ml-1"><IconUserCircle class="w-4 h-4" /> My account</a>
 {{#else}}
-        <a href="/login" class="hidden sm:inline-flex text-sm px-3.5 py-1.5 rounded-lg text-soft hover:bg-raised transition-colors">Log in</a>
-        <a href="/register" class="hidden sm:inline-flex text-sm px-4 py-1.5 rounded-lg bg-brand text-white font-semibold hover:bg-brand-hover transition-colors">Get started</a>
+        <a href="/login" class="hidden sm:inline-flex bb-nav-link">Log in</a>
+        <a href="/register" class="hidden sm:inline-flex tx-btn tx-btn-primary tx-btn-sm ml-1">Create account</a>
 {{/if}}
 
         <button
@@ -89,29 +82,49 @@ template
           aria-label="Toggle menu"
           aria-expanded="{{ mobileMenuOpen }}"
           aria-controls="mobile-menu"
-          class="md:hidden w-9 h-9 flex items-center justify-center rounded-lg text-muted hover:bg-raised transition-colors"
+          class="lg:hidden tx-icon-btn"
         >
 {{#if mobileMenuOpen}}
-          <IconX class="w-[18px] h-[18px]" />
+          <IconX class="w-5 h-5" />
 {{#else}}
-          <IconMenu class="w-[18px] h-[18px]" />
+          <IconMenu class="w-5 h-5" />
 {{/if}}
         </button>
       </div>
     </nav>
 
 {{#if mobileMenuOpen}}
-    <div id="mobile-menu" class="md:hidden border-t border-line bg-canvas px-6 py-4 flex flex-col gap-1">
+    <div id="mobile-menu" class="lg:hidden border-t border-line bg-panel max-h-[calc(100dvh-4rem)] overflow-y-auto">
+      <div class="max-w-7xl mx-auto px-3 sm:px-5 pt-3 pb-5">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-0.5">
 {{#each link in links}}
-      <a href="{{ link.href }}" onclick="{{ closeMobileMenu() }}" class="text-sm text-soft hover:bg-raised rounded-lg px-3 py-2.5 transition-colors">{{ link.label }}</a>
+          <a href="{{ link.href }}" onclick="{{ closeMobileMenu() }}" class="{{ sheetClass(link.href) }}">
+{{#if link.href is "/rent"}}<IconKey />{{#else if link.href is "/buy"}}<IconTag />{{#else if link.href is "/vacant-units"}}<IconHome />{{#else if link.href is "/land"}}<IconTree />{{#else if link.href is "/commercial"}}<IconBuildingOffice />{{#else}}<IconNewspaper />{{/if}}
+            {{ link.label }}
+          </a>
 {{/each}}
-      <div class="h-px bg-line my-2"></div>
+          <a href="/p/about#landlords" onclick="{{ closeMobileMenu() }}" class="{{ sheetClass('/p/about') }}"><IconBuildingOffice /> For landlords</a>
+          <a href="/contact" onclick="{{ closeMobileMenu() }}" class="{{ sheetClass('/contact') }}"><IconChatBubble /> Contact us</a>
+        </div>
+
+        <div class="h-px bg-line my-3 mx-2"></div>
+
 {{#if Auth.user}}
-      <button onclick="{{ Auth.logout() }}" class="text-sm text-left text-soft hover:bg-raised rounded-lg px-3 py-2.5 transition-colors">Log out</button>
-{{#else}}
-      <a href="/login" onclick="{{ closeMobileMenu() }}" class="text-sm text-soft hover:bg-raised rounded-lg px-3 py-2.5 transition-colors">Log in</a>
-      <a href="/register" onclick="{{ closeMobileMenu() }}" class="text-sm text-center font-semibold bg-brand text-white rounded-lg px-3 py-2.5 mt-1">Get started</a>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-0.5">
+          <a href="/dashboard" class="{{ sheetClass('/dashboard') }}"><IconUserCircle /> My account</a>
+          <a href="/tenant" class="{{ sheetClass('/tenant') }}"><IconKey /> Tenant portal</a>
+{{#if can("admin.access")}}
+          <a href="/admin" class="{{ sheetClass('/admin') }}"><IconLayoutGrid /> Admin</a>
 {{/if}}
+          <button onclick="{{ Auth.logout() }}" class="bb-sheet-link"><IconLogout /> Log out</button>
+        </div>
+{{#else}}
+        <div class="grid grid-cols-2 gap-2 px-1">
+          <a href="/login" onclick="{{ closeMobileMenu() }}" class="tx-btn tx-btn-outline">Log in</a>
+          <a href="/register" onclick="{{ closeMobileMenu() }}" class="tx-btn tx-btn-primary">Create account</a>
+        </div>
+{{/if}}
+      </div>
     </div>
 {{/if}}
   </header>

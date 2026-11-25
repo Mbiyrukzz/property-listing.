@@ -1,0 +1,226 @@
+page AdminApplications
+
+import AdminNav from "../components/AdminNav"
+import { IconClipboardCheck, IconPhone, IconMail, IconExternalLink } from "tylix-icons"
+
+title "Applications | Barani Better Homes admin"
+
+needs
+  Auth
+
+permissions
+  applications.view
+
+uses
+  Fmt
+
+state
+  rows: []
+  loading: true
+  loadError: ""
+  status: "open"
+  kind: ""
+  openId: null
+  draft: { status: "", reviewNotes: "" }
+  saving: false
+  notice: ""
+  formError: ""
+
+computed
+  shown() {
+    if this.status is "open" {
+      return this.rows.filter(r => r.status is "submitted" or r.status is "reviewing")
+    }
+    if this.status {
+      return this.rows.filter(r => r.status is this.status)
+    }
+    return this.rows
+  }
+
+action
+  chip(status) {
+    if status is "approved" {
+      return "bb-chip bb-chip-ok"
+    }
+    if status is "rejected" or status is "withdrawn" {
+      return "bb-chip bb-chip-bad"
+    }
+    if status is "reviewing" {
+      return "bb-chip bb-chip-brand"
+    }
+    return "bb-chip bb-chip-warn"
+  }
+
+  // onchange runs before bind:value updates, so take the value from the event.
+  async filterBy(field, value) {
+    if field is "status" {
+      this.status = value
+    } else if field is "kind" {
+      this.kind = value
+    }
+    await this.load()
+  }
+
+  async load() {
+    this.loadError = ""
+    const p = new URLSearchParams()
+    if this.status and this.status is not "open" {
+      p.set("status", this.status)
+    }
+    if this.kind {
+      p.set("kind", this.kind)
+    }
+    const qs = p.toString()
+    const visible = new URLSearchParams(p)
+    if this.status is "open" {
+      visible.set("status", "open")
+    }
+    window.history.replaceState(null, "", "/admin/applications?" + visible.toString())
+    const result = await useApi("/api/admin/applications" + (qs ? "?" + qs : ""))
+    if result.ok {
+      this.rows = result.data.data
+    } else {
+      this.loadError = Fmt.firstError(result)
+    }
+    this.loading = false
+  }
+
+  toggle(row) {
+    this.formError = ""
+    this.notice = ""
+    if this.openId is row.id {
+      this.openId = null
+      return null
+    }
+    this.openId = row.id
+    this.draft = { status: row.status is "submitted" ? "reviewing" : row.status, reviewNotes: row.reviewNotes }
+  }
+
+  async save(row) {
+    if this.draft.status is "rejected" and row.status is not "rejected" and not confirm("Reject this application?") {
+      return null
+    }
+    this.saving = true
+    this.formError = ""
+    const result = await useApi(`/api/admin/applications/${row.id}`, { method: "PUT", body: { status: this.draft.status, reviewNotes: this.draft.reviewNotes } })
+    this.saving = false
+    if result.ok {
+      this.notice = "Application from " + row.fullName + " is now " + Fmt.label(this.draft.status).toLowerCase() + "."
+      this.openId = null
+      await this.load()
+      return null
+    }
+    this.formError = Fmt.firstError(result)
+  }
+
+onMount
+  async {
+    const p = new URLSearchParams(window.location.search)
+    if p.get("status") is not null {
+      this.status = p.get("status")
+    }
+    this.kind = p.get("kind") ?? ""
+    await this.load()
+  }
+
+template
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-5 sm:py-8 grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-4 lg:gap-8">
+    <AdminNav current="applications" />
+
+    <div class="min-w-0">
+      <h1 class="text-2xl font-bold tracking-tight">Applications</h1>
+      <p class="text-sm text-muted mt-1 mb-6">Rental applications and purchase offers. The applicant sees the status and your decision in their account.</p>
+
+      <div class="flex flex-wrap gap-2 mb-4">
+        <select class="tx-input !mb-0 !w-auto" aria-label="Status" bind:value="{{ status }}" onchange="{{ filterBy('status', $event.target.value) }}">
+          <option value="open">To review</option>
+          <option value="submitted">Submitted</option>
+          <option value="reviewing">Reviewing</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
+          <option value="withdrawn">Withdrawn</option>
+          <option value="">All</option>
+        </select>
+        <select class="tx-input !mb-0 !w-auto" aria-label="Kind" bind:value="{{ kind }}" onchange="{{ filterBy('kind', $event.target.value) }}">
+          <option value="">Rentals & offers</option>
+          <option value="rental">Rental applications</option>
+          <option value="purchase">Purchase offers</option>
+        </select>
+      </div>
+
+{{#if notice}}<div class="tx-alert tx-alert-success mb-4" role="status"><p class="text-sm">{{ notice }}</p></div>{{/if}}
+{{#if loadError}}<div class="tx-alert tx-alert-error mb-4" role="alert"><p class="text-sm">{{ loadError }}</p></div>{{/if}}
+
+{{#if loading}}
+      <div data-page-loader="true" class="text-sm text-muted">Loading…</div>
+{{#else if shown.length is 0}}
+      <div class="tx-panel p-8 text-center">
+        <IconClipboardCheck class="w-6 h-6 text-muted mx-auto mb-3" />
+        <p class="text-sm text-muted">No applications here.</p>
+      </div>
+{{#else}}
+{{#each r in shown}}
+      <article class="tx-panel mb-3">
+        <button class="w-full text-left p-4 flex flex-wrap items-start justify-between gap-3" aria-expanded="{{ openId is r.id ? 'true' : 'false' }}" onclick="{{ toggle(r) }}">
+          <div class="min-w-0">
+            <p class="font-medium">{{ r.fullName }} <span class="text-muted font-normal">· {{ r.kind is "purchase" ? "Purchase offer" : "Rental application" }}</span></p>
+            <p class="text-sm text-soft mt-0.5">{{ r.listing ? r.listing.title : "Listing removed" }}{{ r.unit ? " (" + r.unit + ")" : "" }}</p>
+            <p class="text-xs text-muted mt-1">Sent {{ Fmt.ago(r.createdAt) }}{{ r.offerAmount ? " · offer " + Fmt.kes(r.offerAmount) : "" }}{{ r.moveInDate ? " · move-in " + Fmt.date(r.moveInDate) : "" }}</p>
+          </div>
+          <span class="{{ chip(r.status) }}">{{ Fmt.label(r.status) }}</span>
+        </button>
+{{#if openId is r.id}}
+        <div class="border-t border-line p-4">
+          <dl class="grid sm:grid-cols-3 gap-x-6 gap-y-3 text-sm mb-4">
+            <div><dt class="text-xs text-muted">Phone</dt><dd><a class="tx-link" href="tel:{{ r.phone }}">{{ r.phone }}</a></dd></div>
+            <div><dt class="text-xs text-muted">Email</dt><dd class="break-all"><a class="tx-link" href="mailto:{{ r.email }}">{{ r.email }}</a></dd></div>
+            <div><dt class="text-xs text-muted">ID / passport</dt><dd>{{ r.idNumber }}</dd></div>
+            <div><dt class="text-xs text-muted">Occupation</dt><dd>{{ r.occupation or "—" }}</dd></div>
+            <div><dt class="text-xs text-muted">Employer</dt><dd>{{ r.employer or "—" }}</dd></div>
+            <div><dt class="text-xs text-muted">Monthly income</dt><dd>{{ r.monthlyIncome is null ? "—" : Fmt.kes(r.monthlyIncome) }}</dd></div>
+{{#if r.kind is "purchase"}}
+            <div><dt class="text-xs text-muted">Offer</dt><dd>{{ r.offerAmount is null ? "—" : Fmt.kes(r.offerAmount) }}</dd></div>
+            <div><dt class="text-xs text-muted">Financing</dt><dd>{{ r.financing ? Fmt.label(r.financing) : "—" }}</dd></div>
+{{#else}}
+            <div><dt class="text-xs text-muted">Move-in</dt><dd>{{ Fmt.date(r.moveInDate) or "—" }}</dd></div>
+            <div><dt class="text-xs text-muted">Occupants</dt><dd>{{ r.occupants ?? "—" }}</dd></div>
+{{/if}}
+{{#if r.listing}}
+            <div><dt class="text-xs text-muted">Listing</dt><dd><a class="tx-link inline-flex items-center gap-1" href="/admin/listings/{{ r.listing.id }}">Open <IconExternalLink class="w-3.5 h-3.5" /></a></dd></div>
+{{/if}}
+          </dl>
+{{#if r.notes}}<p class="text-sm text-soft mb-4"><span class="text-muted">Applicant's note:</span> {{ r.notes }}</p>{{/if}}
+{{#if r.reviewedAt}}<p class="text-xs text-muted mb-4">Last decision {{ Fmt.dateTime(r.reviewedAt) }}.</p>{{/if}}
+
+{{#if r.status is "withdrawn"}}
+          <p class="text-sm text-muted">The applicant withdrew this application.</p>
+{{#else if can("applications.manage")}}
+          <form onsubmit.prevent="{{ save(r) }}">
+            <label class="tx-label" for="ap-status-{{ r.id }}">Decision</label>
+            <select id="ap-status-{{ r.id }}" class="tx-input sm:max-w-xs" bind:value="{{ draft.status }}">
+              <option value="submitted">Submitted (not looked at)</option>
+              <option value="reviewing">Reviewing</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+            <label class="tx-label" for="ap-notes-{{ r.id }}">Notes for the file</label>
+            <textarea id="ap-notes-{{ r.id }}" class="tx-input" rows="3" placeholder="Only staff see these" bind:value="{{ draft.reviewNotes }}"></textarea>
+{{#if formError}}<div class="tx-alert tx-alert-error mb-3" role="alert"><p class="text-sm">{{ formError }}</p></div>{{/if}}
+            <div class="flex gap-2">
+              <button type="submit" class="tx-btn tx-btn-primary tx-btn-sm" disabled="{{ saving }}">{{ saving ? "Saving…" : "Save decision" }}</button>
+              <button type="button" class="tx-btn tx-btn-ghost tx-btn-sm" onclick="{{ toggle(r) }}">Close</button>
+            </div>
+{{#if r.kind is "rental"}}
+            <p class="text-xs text-muted mt-3">Approving doesn't create the tenancy. Add the tenant to the unit in HQ; the unit then leaves the site on its own.</p>
+{{/if}}
+          </form>
+{{#else if r.reviewNotes}}
+          <p class="text-sm"><span class="text-muted">Notes:</span> {{ r.reviewNotes }}</p>
+{{/if}}
+        </div>
+{{/if}}
+      </article>
+{{/each}}
+{{/if}}
+    </div>
+  </div>

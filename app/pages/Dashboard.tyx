@@ -1,33 +1,26 @@
 page Dashboard
 
-import CreatePostForm from "./components/CreatePostForm"
-import { IconUser, IconDocument, IconDatabase, IconFolder } from "tylix-icons"
+import AccountNav from "./components/AccountNav"
+import { IconHeart, IconClipboardList, IconCalendar, IconChatBubble, IconKey, IconArrowRight, IconAlertOctagon } from "tylix-icons"
 
-title "Dashboard"
+title "My account | Barani Better Homes"
 
 needs
   Auth
 
 uses
-  Mail
-  Analytics
-
-background
-  Analytics
-  Mail
-
-permissions
-  posts.view
+  Fmt
 
 meta
   transition "fade"
 
 state
-  checkedAuth: false
-  features: []
-  posts: []
-  loadingPosts: true
-  postError: ""
+  ready: false
+  counts: { saved: 0, enquiries: 0, viewings: 0, applications: 0 }
+  recent: []
+  tenant: { linked: false }
+  profile: null
+  loadError: ""
 
 computed
   greeting() {
@@ -41,34 +34,28 @@ computed
     return "Good evening"
   }
 
-  postCountLabel() {
-    const count = this.posts.length
-    return `${count} ${count is 1 ? "post" : "posts"}`
-  }
-
 action
-  formatDate(value) {
-    if not value {
-      return ""
+  typeLabel(type) {
+    if type is "viewing" {
+      return "Viewing request"
     }
-    return new Date(value).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+    if type is "application" {
+      return "Application"
+    }
+    return "Enquiry"
   }
 
-  addPost(post) {
-    this.posts = [post, ...this.posts]
-  }
-
-  async removePost(post) {
-    if not confirm("Delete this post?") {
-      return null
+  chip(status) {
+    if status is "approved" or status is "confirmed" or status is "completed" {
+      return "bb-chip bb-chip-ok"
     }
-    this.postError = ""
-    const result = await deleteApi("posts", post.id)
-    if result.ok {
-      this.posts = this.posts.filter(p => p.id is not post.id)
-    } else {
-      this.postError = result.error ?? "Couldn't delete that post."
+    if status is "rejected" or status is "cancelled" or status is "withdrawn" {
+      return "bb-chip bb-chip-bad"
     }
+    if status is "closed" {
+      return "bb-chip bb-chip-muted"
+    }
+    return "bb-chip bb-chip-warn"
   }
 
 onMount
@@ -77,110 +64,95 @@ onMount
       window.location.href = "/login"
       return null
     }
-
-    const featureResult = await useApi("/api/_tylix/features")
-    if featureResult.ok {
-      this.features = featureResult.data.data.filter(f => f.table is not "posts")
-    }
-
-    const postResult = await getApi("posts")
-    if postResult.ok {
-      this.posts = postResult.data
+    const result = await useApi("/api/account/overview")
+    if result.ok {
+      this.counts = result.data.counts
+      this.recent = result.data.recent
+      this.tenant = result.data.tenant
+      this.profile = result.data.profile
     } else {
-      this.postError = postResult.error ?? "Couldn't load your posts."
+      this.loadError = "Your account summary couldn't be loaded. Refresh to try again."
     }
-    this.loadingPosts = false
-
-    this.checkedAuth = true
+    this.ready = true
   }
 
 template
-{{#if checkedAuth}}
-  <div class="max-w-6xl mx-auto px-6 py-12">
-    <div class="mb-10">
-      <p class="tx-eyebrow mb-3">{{ greeting }}</p>
-      <h1 class="text-3xl font-semibold tracking-tight">{{ Auth.user.name }}</h1>
-    </div>
+{{#if Auth.user}}
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-5 sm:py-8 grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-4 lg:gap-8">
+    <AccountNav current="overview" />
 
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
-      <div class="tx-panel p-5">
-        <IconUser class="w-4 h-4 text-mint mb-3" />
-        <p class="text-xs text-muted mb-1">Signed in as</p>
-        <p class="text-sm font-semibold truncate">{{ Auth.user.email }}</p>
-      </div>
+    <div class="min-w-0">
+      <p class="tx-eyebrow mb-2">{{ greeting }}</p>
+      <h1 class="text-[1.75rem] leading-tight sm:text-3xl font-bold tracking-tight mb-6">{{ Auth.user.name }}</h1>
 
-      <div class="tx-panel p-5">
-        <IconDatabase class="w-4 h-4 text-mint mb-3" />
-        <p class="text-xs text-muted mb-1">Visitors today</p>
-        <p class="text-2xl font-semibold">{{ Analytics.visitorsToday }}</p>
-      </div>
-
-      <div class="tx-panel p-5">
-        <IconDocument class="w-4 h-4 text-mint mb-3" />
-        <p class="text-xs text-muted mb-1">Your posts</p>
-        <p class="text-2xl font-semibold">{{ posts.length }}</p>
-      </div>
-
-{{#if Mail.available}}
-      <a href="/dashboard/mail" class="tx-panel p-5 hover:border-line-strong transition-colors">
-        <IconFolder class="w-4 h-4 text-mint mb-3" />
-        <p class="text-xs text-muted mb-1">Mail</p>
-        <p class="text-2xl font-semibold">{{ Mail.unread }}</p>
-      </a>
-{{/if}}
-    </div>
-
-    <div class="flex items-center justify-between mb-5">
-      <div>
-        <h2 class="text-lg font-semibold tracking-tight">Your posts</h2>
-        <p class="text-sm text-muted">{{ postCountLabel }}</p>
-      </div>
-      <CreatePostForm onCreated="{{ addPost }}" />
-    </div>
-
-{{#if postError}}
-    <p role="alert" class="text-sm text-coral mb-4">{{ postError }}</p>
+{{#if loadError}}
+      <div class="tx-alert tx-alert-error mb-6"><p class="text-sm">{{ loadError }}</p></div>
 {{/if}}
 
-{{#if loadingPosts}}
-    <p class="text-sm text-muted mb-12">Loading posts…</p>
-{{#else if posts.length is 0}}
-    <div class="rounded-lg border border-dashed border-line-strong p-10 text-center mb-12">
-      <h3 class="font-medium mb-1.5">No posts yet</h3>
-      <p class="text-sm text-muted">Click “New Post” to publish your first one.</p>
-    </div>
+{{#if ready and profile and not profile.emailVerified}}
+      <div class="tx-alert tx-alert-info mb-6 flex items-start gap-2"><IconAlertOctagon class="w-4 h-4 mt-0.5 shrink-0" /><p class="text-sm">Confirm your email address (check your inbox) so we can send you viewing confirmations.</p></div>
+{{/if}}
+
+      <div class="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-6 sm:mb-8">
+        <a href="/account/saved" class="tx-panel p-4 sm:p-5 flex flex-col gap-3">
+          <span class="bb-icon-tile bb-icon-tile-sm bb-tint-blush"><IconHeart /></span>
+          <div><p class="text-2xl sm:text-[1.75rem] font-bold tracking-tight leading-none">{{ counts.saved }}</p><p class="text-xs text-muted mt-1.5">Saved properties</p></div>
+        </a>
+        <a href="/account/activity" class="tx-panel p-4 sm:p-5 flex flex-col gap-3">
+          <span class="bb-icon-tile bb-icon-tile-sm bb-tint-apricot"><IconCalendar /></span>
+          <div><p class="text-2xl sm:text-[1.75rem] font-bold tracking-tight leading-none">{{ counts.viewings }}</p><p class="text-xs text-muted mt-1.5">Upcoming viewings</p></div>
+        </a>
+        <a href="/account/activity" class="tx-panel p-4 sm:p-5 flex flex-col gap-3">
+          <span class="bb-icon-tile bb-icon-tile-sm bb-tint-lilac"><IconClipboardList /></span>
+          <div><p class="text-2xl sm:text-[1.75rem] font-bold tracking-tight leading-none">{{ counts.applications }}</p><p class="text-xs text-muted mt-1.5">Applications in review</p></div>
+        </a>
+        <a href="/account/activity" class="tx-panel p-4 sm:p-5 flex flex-col gap-3">
+          <span class="bb-icon-tile bb-icon-tile-sm bb-tint-leaf"><IconChatBubble /></span>
+          <div><p class="text-2xl sm:text-[1.75rem] font-bold tracking-tight leading-none">{{ counts.enquiries }}</p><p class="text-xs text-muted mt-1.5">Enquiries sent</p></div>
+        </a>
+      </div>
+
+      <div class="grid xl:grid-cols-[1fr_320px] gap-4 sm:gap-6 items-start">
+        <section class="tx-panel overflow-hidden">
+          <div class="flex items-center justify-between px-5 py-4 border-b border-line">
+            <h2 class="font-semibold">Recent activity</h2>
+            <a href="/account/activity" class="text-sm tx-link">See all</a>
+          </div>
+{{#if not ready}}
+          <p class="p-4 text-sm text-muted">Loading…</p>
+{{#else if recent.length is 0}}
+          <div class="p-6 text-center">
+            <p class="text-sm text-muted mb-4">Nothing yet. Find a place you like, then book a viewing or apply.</p>
+            <a href="/properties" class="tx-btn tx-btn-primary tx-btn-sm">Browse properties</a>
+          </div>
 {{#else}}
-    <div class="tx-panel divide-y divide-line mb-12">
-{{#each p in posts}}
-      <div class="flex items-center gap-4 p-4">
-{{#if p.cover_image}}
-        <img src="{{ p.cover_image }}" alt="" class="w-16 h-12 rounded-lg object-cover border border-line shrink-0" />
-{{#else}}
-        <div class="w-16 h-12 rounded-lg bg-raised shrink-0"></div>
-{{/if}}
-        <div class="min-w-0 flex-1">
-          <a href="{{ `/posts/${p.id}` }}" class="block font-medium truncate hover:text-link transition-colors">{{ p.title }}</a>
-          <p class="text-xs text-muted">{{ formatDate(p.created_at) }}</p>
-        </div>
-        <button onclick="{{ removePost(p) }}" class="text-sm text-muted hover:text-coral px-2 py-1 transition-colors">Delete</button>
-      </div>
+          <ul class="divide-y divide-line">
+{{#each r in recent}}
+            <li class="px-5 py-3.5 flex items-center justify-between gap-3 hover:bg-raised">
+              <div class="min-w-0">
+                <p class="text-sm font-medium truncate">{{ typeLabel(r.type) }}{{ r.listing ? " · " + r.listing.title : "" }}</p>
+                <p class="text-xs text-muted">{{ Fmt.ago(r.at) }}</p>
+              </div>
+              <span class="{{ chip(r.status) }}">{{ Fmt.label(r.status) }}</span>
+            </li>
 {{/each}}
-    </div>
+          </ul>
 {{/if}}
+        </section>
 
-{{#if features.length > 0}}
-    <div class="mb-5">
-      <h2 class="text-lg font-semibold tracking-tight">Scaffolded features</h2>
-      <p class="text-sm text-muted">Generated with tylix make:feature</p>
-    </div>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-{{#each f in features}}
-      <div class="tx-panel p-5">
-        <h3 class="font-medium mb-1">{{ f.name }}</h3>
-        <code class="text-xs font-mono text-muted">/api/{{ f.table }}</code>
-      </div>
-{{/each}}
-    </div>
+        <section class="rounded-[18px] bg-night text-white p-5 sm:p-6">
+          <span class="bb-icon-tile bb-icon-tile-sm bg-white/10 text-butter mb-4"><IconKey /></span>
+{{#if tenant.linked}}
+          <h2 class="font-semibold mb-1">Your tenancy</h2>
+          <p class="text-sm text-white/70 mb-5">Linked to account {{ tenant.accountNumber }} ({{ tenant.name }}).</p>
+          <a href="/tenant" class="tx-btn tx-btn-sm bg-white !text-[#1B183D] hover:bg-lilac">Balance & payments <IconArrowRight class="w-4 h-4" /></a>
+{{#else}}
+          <h2 class="font-semibold mb-1">Renting through us?</h2>
+          <p class="text-sm text-white/70 mb-5">Link your tenancy to see your rent balance and receipts, and pay by M-Pesa.</p>
+          <a href="/tenant" class="tx-btn tx-btn-sm bg-white !text-[#1B183D] hover:bg-lilac">Link my tenancy</a>
 {{/if}}
+        </section>
+      </div>
+    </div>
   </div>
 {{/if}}

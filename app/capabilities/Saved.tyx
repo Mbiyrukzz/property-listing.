@@ -1,0 +1,40 @@
+capability Saved
+
+state
+  ids: []
+  ready: false
+
+action
+  has(id) {
+    return this.ids.includes(Number(id))
+  }
+
+  // Signed-out visitors are sent to log in first, then back here.
+  async toggle(id) {
+    const key = Number(id)
+    if this.has(key) {
+      this.ids = this.ids.filter(x => x is not key)
+      const result = await useApi(`/api/account/saved/${key}`, { method: "DELETE" })
+      if not result.ok {
+        this.ids = [...this.ids, key]
+      }
+      return null
+    }
+    this.ids = [...this.ids, key]
+    const result = await useApi("/api/account/saved", { method: "POST", body: { property_id: key } })
+    if result.status is 401 {
+      this.ids = this.ids.filter(x => x is not key)
+      window.location.href = "/login?next=" + encodeURIComponent(window.location.pathname + window.location.search)
+    } else if not result.ok {
+      this.ids = this.ids.filter(x => x is not key)
+    }
+  }
+
+init
+  async {
+    const result = await useApi("/api/account/saved/ids")
+    if result.ok {
+      this.ids = result.data.data
+    }
+    this.ready = true
+  }

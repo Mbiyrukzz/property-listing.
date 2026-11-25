@@ -1,0 +1,277 @@
+page PropertyDetail
+
+import ListingCard from "../components/ListingCard"
+import LeadForm from "../components/LeadForm"
+import { IconMapPin, IconBed, IconBath, IconRuler, IconHeart, IconHome, IconPhone, IconWhatsapp, IconMail, IconCheck, IconArrowLeft, IconRefresh, IconClipboardCheck, IconChevronLeft, IconChevronRight } from "tylix-icons"
+
+title "Property"
+
+props
+  slug: string
+
+needs
+  Auth
+
+uses
+  Saved
+  Site
+  Fmt
+
+state
+  listing: null
+  similar: []
+  loading: true
+  isMissing: false
+  loadFailed: false
+  photo: 0
+
+computed
+  images() {
+    return this.listing ? this.listing.images : []
+  }
+
+  currentPhoto() {
+    return this.images[this.photo] ?? null
+  }
+
+  isRental() {
+    return this.listing and this.listing.purpose is "rent"
+  }
+
+  fullyLet() {
+    return this.listing and (this.listing.status is "let" or (this.listing.fromProperman and this.listing.units.length is 0))
+  }
+
+  priceLabel() {
+    const l = this.listing
+    if not l {
+      return ""
+    }
+    if l.fromProperman and l.units.length > 1 {
+      return "From " + Fmt.price(l.price, "rent")
+    }
+    return Fmt.price(l.price, l.purpose)
+  }
+
+  applyHref() {
+    return `/properties/${this.slug}/apply`
+  }
+
+  enquiryText() {
+    if not this.listing {
+      return ""
+    }
+    return this.isRental ? "Is this still available? I'd like to know more about " + this.listing.title + "." : "I'm interested in " + this.listing.title + ". Is the price negotiable?"
+  }
+
+  whatsappHref() {
+    const number = this.listing?.agent?.whatsapp or Site.settings.whatsapp
+    if not number {
+      return ""
+    }
+    return Fmt.whatsapp(number, "Hello, I'm interested in " + this.listing.title + " (" + window.location.href + ")")
+  }
+
+action
+  pick(i) {
+    this.photo = i
+  }
+
+  next(step) {
+    const n = this.images.length
+    if n > 0 {
+      this.photo = (this.photo + step + n) % n
+    }
+  }
+
+  async load() {
+    this.loading = true
+    this.loadFailed = false
+    const result = await useApi(`/api/listings/${encodeURIComponent(this.slug)}`)
+    if result.ok {
+      this.listing = result.data.data
+      this.similar = result.data.similar
+      this.photo = 0
+      document.title = this.listing.title + " | " + Site.settings.site_name
+      this.recordView()
+    } else if result.status is 404 {
+      this.isMissing = true
+      document.title = "Listing not available"
+    } else {
+      this.loadFailed = true
+    }
+    this.loading = false
+  }
+
+  recordView() {
+    if Auth.user {
+      useApi("/api/account/history", { method: "POST", body: { property_id: this.listing.id } })
+    } else {
+      useApi(`/api/listings/${this.listing.id}/view`, { method: "POST" })
+    }
+  }
+
+onMount
+  async {
+    await this.load()
+  }
+
+template
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+{{#if loading}}
+    <div class="grid lg:grid-cols-[1fr_380px] gap-6 lg:gap-8" data-page-loader="true">
+      <div class="bb-card aspect-[4/3] animate-pulse"></div>
+      <div class="bb-card h-96 animate-pulse"></div>
+    </div>
+{{#else if isMissing}}
+    <div class="max-w-lg mx-auto text-center py-16">
+      <span class="bb-icon-tile bb-tint-lilac w-14 h-14 rounded-2xl mb-4"><IconHome class="w-6 h-6" /></span>
+      <h1 class="text-2xl font-bold mb-2">This listing isn't available any more</h1>
+      <p class="text-muted mb-6">It may have been let, sold or taken off the market. There's plenty more to see.</p>
+      <a href="/properties" class="tx-btn tx-btn-primary">Browse properties</a>
+    </div>
+{{#else if loadFailed}}
+    <div class="tx-alert tx-alert-error"><p class="text-sm">This listing couldn't be loaded. <button class="underline" onclick="{{ load() }}">Try again</button></p></div>
+{{#else}}
+    <a href="{{ isRental ? '/rent' : '/buy' }}" class="tx-btn tx-btn-ghost tx-btn-sm -ml-3 mb-3"><IconArrowLeft class="w-4 h-4" /> Back to {{ isRental ? "rentals" : "properties for sale" }}</a>
+
+    <div class="grid lg:grid-cols-[1fr_380px] gap-6 lg:gap-8 items-start">
+      <div class="min-w-0">
+        <div class="bb-card hover:!transform-none">
+          <div class="bb-photo !aspect-[4/3] sm:!aspect-[16/10]">
+{{#if currentPhoto}}
+            <img src="{{ currentPhoto }}" alt="{{ `Photo ${photo + 1} of ${listing.title}` }}" />
+{{#else}}
+            <div class="bb-photo-empty"><IconHome class="w-14 h-14" /></div>
+{{/if}}
+{{#if images.length > 1}}
+            <button class="bb-gallery-btn left-3" aria-label="Previous photo" onclick="{{ next(-1) }}"><IconChevronLeft class="w-5 h-5" /></button>
+            <button class="bb-gallery-btn right-3" aria-label="Next photo" onclick="{{ next(1) }}"><IconChevronRight class="w-5 h-5" /></button>
+            <span class="absolute bottom-3 right-3 bb-chip">{{ photo + 1 }} / {{ images.length }}</span>
+{{/if}}
+          </div>
+{{#if images.length > 1}}
+          <div class="flex gap-2 pt-2 overflow-x-auto">
+{{#each img, i in images}}
+            <button onclick="{{ pick(i) }}" class="{{ 'shrink-0 w-20 h-14 rounded-xl overflow-hidden border-2 ' + (i is photo ? 'border-brand' : 'border-transparent') }}" aria-label="{{ `Show photo ${i + 1}` }}">
+              <img src="{{ img }}" alt="" class="w-full h-full object-cover" loading="lazy" />
+            </button>
+{{/each}}
+          </div>
+{{/if}}
+        </div>
+
+        <div class="mt-6">
+          <div class="flex flex-wrap gap-2 mb-3">
+            <span class="bb-chip !bg-lilac !text-brand dark:!text-link !border-transparent">{{ listing.categoryLabel }}</span>
+            <span class="{{ isRental ? 'bb-chip' : 'bb-chip bb-chip-dark' }}">{{ isRental ? "To let" : "For sale" }}</span>
+{{#if listing.status is "under_offer"}}<span class="bb-chip bb-chip-warn">Under offer</span>{{/if}}
+{{#if fullyLet}}<span class="bb-chip bb-chip-bad">Fully let</span>{{/if}}
+{{#if listing.fromProperman}}<span class="bb-chip bb-chip-ok"><IconRefresh class="w-3 h-3" /> Live availability</span>{{/if}}
+          </div>
+          <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">{{ listing.title }}</h1>
+          <p class="text-muted flex items-center gap-1.5 mt-2"><IconMapPin class="w-4 h-4" /> {{ listing.location }}{{ listing.address ? " · " + listing.address : "" }}</p>
+          <p class="lg:hidden text-[1.75rem] font-bold tracking-tight mt-4 text-brand dark:text-link">{{ priceLabel }}</p>
+
+          <div class="flex flex-wrap gap-2 mt-4 text-sm font-medium text-soft [&>span]:bg-panel [&>span]:border [&>span]:border-line [&>span]:rounded-full [&>span]:px-3 [&>span]:py-1.5">
+{{#if listing.bedrooms is not null and listing.category is not "land"}}<span class="inline-flex items-center gap-1.5"><IconBed class="w-4 h-4 text-muted" /> {{ listing.units.length > 1 ? "Up to " : "" }}{{ Fmt.beds(listing.bedrooms) }}</span>{{/if}}
+{{#if listing.bathrooms}}<span class="inline-flex items-center gap-1.5"><IconBath class="w-4 h-4 text-muted" /> {{ listing.bathrooms }} bath{{ listing.bathrooms is 1 ? "" : "s" }}</span>{{/if}}
+{{#if listing.landSize}}<span class="inline-flex items-center gap-1.5"><IconRuler class="w-4 h-4 text-muted" /> {{ listing.landSize }}</span>{{/if}}
+{{#if listing.sizeSqm}}<span class="inline-flex items-center gap-1.5"><IconRuler class="w-4 h-4 text-muted" /> {{ Math.round(listing.sizeSqm) }} m²</span>{{/if}}
+          </div>
+        </div>
+
+{{#if listing.fromProperman}}
+        <section class="mt-8" aria-labelledby="units-heading">
+          <h2 id="units-heading" class="text-lg font-bold mb-1">Available units</h2>
+          <p class="text-sm text-muted mb-4">{{ listing.vacantUnits }} of {{ listing.totalUnits }} units are vacant right now. This list updates automatically when units are let.</p>
+{{#if listing.units.length is 0}}
+          <div class="rounded-2xl bg-lilac p-5 text-sm text-soft">Every unit is let at the moment. Send an enquiry and we'll tell you when one frees up.</div>
+{{#else}}
+          <ul class="tx-panel !rounded-2xl divide-y divide-line overflow-hidden">
+{{#each u in listing.units}}
+            <li class="flex items-center gap-3 px-4 py-3.5">
+              <span class="bb-icon-tile bb-icon-tile-sm bb-tint-leaf hidden sm:inline-flex"><IconHome /></span>
+              <div class="min-w-0 flex-1">
+                <p class="text-sm font-semibold truncate">{{ u.name }}</p>
+                <p class="text-xs text-muted truncate">{{ u.type }}{{ u.isFurnished ? " · furnished" : "" }}</p>
+              </div>
+              <p class="text-sm font-bold whitespace-nowrap">{{ Fmt.price(u.rent, "rent") }}</p>
+              <a class="tx-btn tx-btn-primary tx-btn-sm" href="{{ applyHref + '?unit=' + u.id }}">Apply</a>
+            </li>
+{{/each}}
+          </ul>
+{{/if}}
+        </section>
+{{/if}}
+
+        <section class="mt-8">
+          <h2 class="text-lg font-bold mb-3">About this property</h2>
+          <div class="bb-prose"><p>{{ listing.description or "Ask us for more details about this property." }}</p></div>
+        </section>
+
+{{#if listing.features.length > 0}}
+        <section class="mt-6">
+          <h2 class="text-lg font-bold mb-3">Features</h2>
+          <ul class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+{{#each f in listing.features}}
+            <li class="flex items-center gap-2.5 text-sm text-soft rounded-xl bg-panel border border-line px-3 py-2.5"><span class="bb-icon-tile bb-tint-leaf !w-6 !h-6 !rounded-full"><IconCheck class="w-3.5 h-3.5" /></span> {{ f }}</li>
+{{/each}}
+          </ul>
+        </section>
+{{/if}}
+      </div>
+
+      <aside class="flex flex-col gap-4 lg:sticky lg:top-20">
+        <div class="tx-panel p-4 sm:p-5 flex flex-col gap-2">
+          <p class="hidden lg:block text-xs font-semibold text-muted">{{ isRental ? "Rent" : "Asking price" }}</p>
+          <p class="hidden lg:block text-2xl font-bold tracking-tight -mt-1 mb-2">{{ priceLabel }}</p>
+{{#if not fullyLet and not (listing.fromProperman and isRental)}}
+          <a href="{{ applyHref }}" class="tx-btn tx-btn-primary tx-btn-block justify-center"><IconClipboardCheck class="w-4 h-4" /> {{ isRental ? "Apply to rent" : "Make an offer" }}</a>
+{{#else if not fullyLet}}
+          <a href="{{ applyHref }}" class="tx-btn tx-btn-primary tx-btn-block justify-center"><IconClipboardCheck class="w-4 h-4" /> Apply for a unit</a>
+{{/if}}
+          <button class="tx-btn tx-btn-outline tx-btn-block justify-center" aria-pressed="{{ Saved.has(listing.id) ? 'true' : 'false' }}" onclick="{{ Saved.toggle(listing.id) }}">
+            <IconHeart class="{{ 'w-4 h-4 ' + (Saved.has(listing.id) ? 'text-coral' : '') }}" /> {{ Saved.has(listing.id) ? "Saved" : "Save" }}
+          </button>
+{{#if whatsappHref}}
+          <a href="{{ whatsappHref }}" target="_blank" rel="noopener" class="tx-btn tx-btn-ghost tx-btn-block justify-center"><IconWhatsapp class="w-4 h-4" /> Ask on WhatsApp</a>
+{{/if}}
+        </div>
+
+{{#if listing.agent}}
+        <div class="tx-panel p-4 flex items-center gap-3">
+{{#if listing.agent.photo}}
+          <img src="{{ listing.agent.photo }}" alt="" class="w-12 h-12 rounded-full object-cover" />
+{{#else}}
+          <span class="w-12 h-12 rounded-full bg-lilac text-brand font-bold flex items-center justify-center">{{ listing.agent.name.charAt(0) }}</span>
+{{/if}}
+          <div class="min-w-0 flex-1">
+            <p class="font-medium truncate">{{ listing.agent.name }}</p>
+            <p class="text-xs text-muted">{{ listing.agent.title or "Agent" }}</p>
+          </div>
+{{#if listing.agent.phone}}<a class="tx-icon-btn" href="{{ `tel:${listing.agent.phone}` }}" aria-label="Call the agent"><IconPhone class="w-4 h-4" /></a>{{/if}}
+{{#if listing.agent.email}}<a class="tx-icon-btn" href="{{ `mailto:${listing.agent.email}` }}" aria-label="Email the agent"><IconMail class="w-4 h-4" /></a>{{/if}}
+        </div>
+{{/if}}
+
+        <div>
+          <h2 class="text-base font-bold mb-2">Interested?</h2>
+          <LeadForm listingId="{{ listing.id }}" units="{{ listing.units }}" purpose="{{ listing.purpose }}" defaultMessage="{{ enquiryText }}" />
+        </div>
+      </aside>
+    </div>
+
+{{#if similar.length > 0}}
+    <section class="mt-14">
+      <p class="tx-eyebrow mb-2">Keep looking</p>
+      <h2 class="text-2xl font-bold tracking-tight mb-5">Similar properties</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+{{#each l in similar}}
+        <ListingCard listing="{{ l }}" />
+{{/each}}
+      </div>
+    </section>
+{{/if}}
+{{/if}}
+  </div>

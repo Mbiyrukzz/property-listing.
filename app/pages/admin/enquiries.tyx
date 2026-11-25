@@ -1,0 +1,225 @@
+page AdminEnquiries
+
+import AdminNav from "../components/AdminNav"
+import { IconChatBubble, IconPhone, IconMail, IconWhatsapp, IconExternalLink, IconUserCheck } from "tylix-icons"
+
+title "Enquiries | Barani Better Homes admin"
+
+needs
+  Auth
+
+permissions
+  enquiries.view
+
+uses
+  Fmt
+
+state
+  rows: []
+  agents: []
+  loading: true
+  loadError: ""
+  status: ""
+  kind: ""
+  openId: null
+  draft: { status: "", adminNotes: "", agentId: "" }
+  saving: false
+  notice: ""
+  formError: ""
+
+computed
+  counts() {
+    return {
+      new: this.rows.filter(r => r.status is "new").length,
+      contacted: this.rows.filter(r => r.status is "contacted").length,
+      closed: this.rows.filter(r => r.status is "closed").length
+    }
+  }
+
+action
+  chip(status) {
+    if status is "new" {
+      return "bb-chip bb-chip-warn"
+    }
+    if status is "contacted" {
+      return "bb-chip bb-chip-ok"
+    }
+    return "bb-chip bb-chip-muted"
+  }
+
+  kindLabel(kind) {
+    if kind is "rental" {
+      return "Rental"
+    }
+    if kind is "purchase" {
+      return "Purchase"
+    }
+    return "General"
+  }
+
+  // onchange runs before bind:value updates, so take the value from the event.
+  async filterBy(field, value) {
+    if field is "status" {
+      this.status = value
+    } else if field is "kind" {
+      this.kind = value
+    }
+    await this.load()
+  }
+
+  async load() {
+    this.loadError = ""
+    const p = new URLSearchParams()
+    if this.status {
+      p.set("status", this.status)
+    }
+    if this.kind {
+      p.set("kind", this.kind)
+    }
+    const qs = p.toString()
+    window.history.replaceState(null, "", "/admin/enquiries" + (qs ? "?" + qs : ""))
+    const result = await useApi("/api/admin/enquiries" + (qs ? "?" + qs : ""))
+    if result.ok {
+      this.rows = result.data.data
+    } else {
+      this.loadError = Fmt.firstError(result)
+    }
+    this.loading = false
+  }
+
+  toggle(row) {
+    this.formError = ""
+    this.notice = ""
+    if this.openId is row.id {
+      this.openId = null
+      return null
+    }
+    this.openId = row.id
+    this.draft = { status: row.status, adminNotes: row.adminNotes, agentId: row.agentId ? String(row.agentId) : "" }
+  }
+
+  async save(row) {
+    this.saving = true
+    this.formError = ""
+    const body = { status: this.draft.status, adminNotes: this.draft.adminNotes, agentId: this.draft.agentId ? Number(this.draft.agentId) : null }
+    const result = await useApi(`/api/admin/enquiries/${row.id}`, { method: "PUT", body: body })
+    this.saving = false
+    if result.ok {
+      this.notice = "Enquiry from " + row.name + " updated."
+      this.openId = null
+      await this.load()
+      return null
+    }
+    this.formError = Fmt.firstError(result)
+  }
+
+onMount
+  async {
+    const p = new URLSearchParams(window.location.search)
+    this.status = p.get("status") ?? ""
+    this.kind = p.get("kind") ?? ""
+    const agents = await useApi("/api/admin/agents")
+    if agents.ok {
+      this.agents = agents.data.data.filter(a => a.isActive)
+    }
+    await this.load()
+  }
+
+template
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-5 sm:py-8 grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-4 lg:gap-8">
+    <AdminNav current="enquiries" />
+
+    <div class="min-w-0">
+      <h1 class="text-2xl font-bold tracking-tight">Enquiries</h1>
+      <p class="text-sm text-muted mt-1 mb-6">Questions sent from listing pages and the contact page. Call back, then mark them contacted.</p>
+
+      <div class="flex flex-wrap gap-2 mb-4">
+        <select class="tx-input !mb-0 !w-auto" aria-label="Status" bind:value="{{ status }}" onchange="{{ filterBy('status', $event.target.value) }}">
+          <option value="">Any status</option>
+          <option value="new">New</option>
+          <option value="contacted">Contacted</option>
+          <option value="closed">Closed</option>
+        </select>
+        <select class="tx-input !mb-0 !w-auto" aria-label="Kind" bind:value="{{ kind }}" onchange="{{ filterBy('kind', $event.target.value) }}">
+          <option value="">Any kind</option>
+          <option value="rental">Rental</option>
+          <option value="purchase">Purchase</option>
+          <option value="general">General</option>
+        </select>
+      </div>
+
+{{#if notice}}<div class="tx-alert tx-alert-success mb-4" role="status"><p class="text-sm">{{ notice }}</p></div>{{/if}}
+{{#if loadError}}<div class="tx-alert tx-alert-error mb-4" role="alert"><p class="text-sm">{{ loadError }}</p></div>{{/if}}
+
+{{#if loading}}
+      <div data-page-loader="true" class="text-sm text-muted">Loading…</div>
+{{#else if rows.length is 0}}
+      <div class="tx-panel p-8 text-center">
+        <IconChatBubble class="w-6 h-6 text-muted mx-auto mb-3" />
+        <p class="text-sm text-muted">No enquiries{{ status ? " with this status" : " yet" }}.</p>
+      </div>
+{{#else}}
+      <p class="text-xs text-muted mb-2">{{ counts.new }} new · {{ counts.contacted }} contacted · {{ counts.closed }} closed</p>
+{{#each r in rows}}
+      <article class="tx-panel mb-3">
+        <button class="w-full text-left p-4 flex flex-wrap items-start justify-between gap-3" aria-expanded="{{ openId is r.id ? 'true' : 'false' }}" onclick="{{ toggle(r) }}">
+          <div class="min-w-0">
+            <p class="font-medium">{{ r.name }} <span class="text-muted font-normal">· {{ r.phone }}</span>{{#if r.isCustomer}} <IconUserCheck class="inline w-4 h-4 text-brand" aria-label="Has an account" />{{/if}}</p>
+            <p class="text-xs text-muted mt-0.5">{{ kindLabel(r.kind) }} · {{ r.listing ? r.listing.title : "No listing" }}{{ r.unit ? " (" + r.unit + ")" : "" }} · {{ Fmt.ago(r.createdAt) }}{{ r.agent ? " · " + r.agent : "" }}</p>
+            <p class="text-sm text-soft mt-2 {{ openId is r.id ? '' : 'line-clamp-2' }}">{{ r.message }}</p>
+          </div>
+          <span class="{{ chip(r.status) }}">{{ Fmt.label(r.status) }}</span>
+        </button>
+{{#if openId is r.id}}
+        <div class="border-t border-line p-4">
+          <div class="flex flex-wrap gap-2 mb-4">
+            <a class="tx-btn tx-btn-outline tx-btn-sm" href="tel:{{ r.phone }}"><IconPhone class="w-4 h-4" /> Call</a>
+{{#if Fmt.whatsapp(r.phone)}}
+            <a class="tx-btn tx-btn-outline tx-btn-sm" href="{{ Fmt.whatsapp(r.phone, 'Hello ' + r.name + ', this is Barani Better Homes about your enquiry.') }}" target="_blank" rel="noopener"><IconWhatsapp class="w-4 h-4" /> WhatsApp</a>
+{{/if}}
+{{#if r.email}}
+            <a class="tx-btn tx-btn-outline tx-btn-sm" href="mailto:{{ r.email }}"><IconMail class="w-4 h-4" /> {{ r.email }}</a>
+{{/if}}
+{{#if r.listing}}
+            <a class="tx-btn tx-btn-ghost tx-btn-sm" href="/admin/listings/{{ r.listing.id }}">Listing <IconExternalLink class="w-4 h-4" /></a>
+{{/if}}
+          </div>
+{{#if can("enquiries.manage")}}
+          <form class="grid sm:grid-cols-2 gap-x-4" onsubmit.prevent="{{ save(r) }}">
+            <div>
+              <label class="tx-label" for="eq-status-{{ r.id }}">Status</label>
+              <select id="eq-status-{{ r.id }}" class="tx-input" bind:value="{{ draft.status }}">
+                <option value="new">New</option>
+                <option value="contacted">Contacted</option>
+                <option value="closed">Closed</option>
+              </select>
+            </div>
+            <div>
+              <label class="tx-label" for="eq-agent-{{ r.id }}">Handled by</label>
+              <select id="eq-agent-{{ r.id }}" class="tx-input" bind:value="{{ draft.agentId }}">
+                <option value="">Nobody yet</option>
+{{#each a in agents}}
+                <option value="{{ a.id }}">{{ a.name }}</option>
+{{/each}}
+              </select>
+            </div>
+            <div class="sm:col-span-2">
+              <label class="tx-label" for="eq-notes-{{ r.id }}">Internal notes</label>
+              <textarea id="eq-notes-{{ r.id }}" class="tx-input" rows="3" placeholder="Only staff see these" bind:value="{{ draft.adminNotes }}"></textarea>
+            </div>
+{{#if formError}}<div class="sm:col-span-2 tx-alert tx-alert-error mb-3" role="alert"><p class="text-sm">{{ formError }}</p></div>{{/if}}
+            <div class="sm:col-span-2 flex gap-2">
+              <button type="submit" class="tx-btn tx-btn-primary tx-btn-sm" disabled="{{ saving }}">{{ saving ? "Saving…" : "Save" }}</button>
+              <button type="button" class="tx-btn tx-btn-ghost tx-btn-sm" onclick="{{ toggle(r) }}">Close</button>
+            </div>
+          </form>
+{{#else if r.adminNotes}}
+          <p class="text-sm"><span class="text-muted">Notes:</span> {{ r.adminNotes }}</p>
+{{/if}}
+        </div>
+{{/if}}
+      </article>
+{{/each}}
+{{/if}}
+    </div>
+  </div>

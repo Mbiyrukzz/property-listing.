@@ -1,0 +1,41 @@
+component AdminNav
+
+import { IconLayoutDashboard, IconBuildingOffice, IconChatBubble, IconCalendarCheck, IconClipboardCheck, IconUsers, IconIdCard, IconDocumentText, IconChartBar, IconPlug, IconShieldCheck, IconNewspaper } from "tylix-icons"
+
+// The administration sidebar. Each link shows only to staff whose role
+// grants the permission its page (and API) requires; see app/permissions.ts.
+
+props
+  current: string
+
+state
+  items: [
+    { key: "overview", label: "Overview", href: "/admin", perm: "admin.access" },
+    { key: "listings", label: "Listings", href: "/admin/listings", perm: "listings.view" },
+    { key: "enquiries", label: "Enquiries", href: "/admin/enquiries", perm: "enquiries.view" },
+    { key: "viewings", label: "Viewings", href: "/admin/viewings", perm: "viewings.manage" },
+    { key: "applications", label: "Applications", href: "/admin/applications", perm: "applications.view" },
+    { key: "customers", label: "Customers", href: "/admin/customers", perm: "customers.view" },
+    { key: "agents", label: "Agents", href: "/admin/agents", perm: "admin.access" },
+    { key: "content", label: "Content & settings", href: "/admin/content", perm: "content.manage" },
+    { key: "news", label: "News posts", href: "/posts", perm: "posts.create" },
+    { key: "reports", label: "Reports", href: "/admin/reports", perm: "reports.view" },
+    { key: "integration", label: "HQ sync", href: "/admin/integration", perm: "integration.view" },
+    { key: "access", label: "Roles & access", href: "/admin/access", perm: "roles.manage" }
+  ]
+
+template
+  <nav aria-label="Administration" class="bb-sidenav">
+    <p class="bb-sidenav-title">Administration</p>
+{{#each item in items}}
+{{#if can(item.perm)}}
+    <a href="{{ item.href }}" class="bb-side-link" aria-current="{{ item.key is current ? 'page' : 'false' }}">
+{{#if item.key is "overview"}}<IconLayoutDashboard class="w-4 h-4" />{{#else if item.key is "listings"}}<IconBuildingOffice class="w-4 h-4" />{{#else if item.key is "enquiries"}}<IconChatBubble class="w-4 h-4" />{{#else if item.key is "viewings"}}<IconCalendarCheck class="w-4 h-4" />{{#else if item.key is "applications"}}<IconClipboardCheck class="w-4 h-4" />{{#else if item.key is "customers"}}<IconUsers class="w-4 h-4" />{{#else if item.key is "agents"}}<IconIdCard class="w-4 h-4" />{{#else if item.key is "content"}}<IconDocumentText class="w-4 h-4" />{{#else if item.key is "news"}}<IconNewspaper class="w-4 h-4" />{{#else if item.key is "reports"}}<IconChartBar class="w-4 h-4" />{{#else if item.key is "integration"}}<IconPlug class="w-4 h-4" />{{#else}}<IconShieldCheck class="w-4 h-4" />{{/if}}
+      {{ item.label }}
+    </a>
+{{/if}}
+{{/each}}
+    <div class="bb-sidenav-foot">
+      <a href="/" class="font-semibold !text-white hover:underline">View the public site →</a>
+    </div>
+  </nav>

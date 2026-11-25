@@ -6,8 +6,8 @@ import PwaPrompt from "./components/PwaPrompt"
 
 template
   <div class="tx-shell">
-    <SiteNavbar showPosts="{{ true }}" />
+    <SiteNavbar />
     <main class="flex-1" data-tylix-slot="true"></main>
     <PwaPrompt />
-    <SiteFooter showPosts="{{ true }}" showAccount="{{ true }}" />
+    <SiteFooter />
   </div>

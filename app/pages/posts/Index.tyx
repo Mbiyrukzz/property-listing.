@@ -1,6 +1,6 @@
 page PostsIndex
 
-title "Posts"
+title "News & guides"
 
 state
   posts: []
@@ -39,9 +39,9 @@ onMount
 template
   <div class="max-w-6xl mx-auto px-6 py-16">
     <div class="max-w-2xl mb-10">
-      <p class="tx-eyebrow mb-3">Blog</p>
-      <h1 class="text-4xl font-semibold tracking-tight mb-3">Posts</h1>
-      <p class="text-muted">Everything published on this site. No account needed to read.</p>
+      <p class="tx-eyebrow mb-3">News & guides</p>
+      <h1 class="text-3xl sm:text-4xl font-bold tracking-tight mb-3">From the Barani Better Homes desk</h1>
+      <p class="text-muted">Market updates, renting and buying guides, and new developments.</p>
     </div>
 
     <input
