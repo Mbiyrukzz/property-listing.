@@ -530,6 +530,13 @@ export interface ApiRoutes {
     response: unknown
     auth: false
   }
+  "GET /api/landlord/session": {
+    params: Record<string, never>
+    query: Record<string, string | number | boolean | undefined>
+    body: undefined
+    response: unknown
+    auth: false
+  }
   "GET /api/landlord/statement/pdf": {
     params: Record<string, never>
     query: Record<string, string | number | boolean | undefined>
@@ -747,6 +754,13 @@ export interface ApiRoutes {
     response: unknown
     auth: false
   }
+  "GET /api/tenant/session": {
+    params: Record<string, never>
+    query: Record<string, string | number | boolean | undefined>
+    body: undefined
+    response: unknown
+    auth: false
+  }
   "GET /api/tenant/statement/pdf": {
     params: Record<string, never>
     query: Record<string, string | number | boolean | undefined>
@@ -890,6 +904,7 @@ export interface RouteClient {
       index(options?: RouteOptions<ApiRoutes["GET /api/landlord/payouts"]['query']>): Promise<ApiResult<ApiRoutes["GET /api/landlord/payouts"]['response']>>
       pdf(params: ApiRoutes["GET /api/landlord/payouts/:id/pdf"]['params'], options?: RouteOptions<ApiRoutes["GET /api/landlord/payouts/:id/pdf"]['query']>): Promise<ApiResult<ApiRoutes["GET /api/landlord/payouts/:id/pdf"]['response']>>
     }
+    session(options?: RouteOptions<ApiRoutes["GET /api/landlord/session"]['query']>): Promise<ApiResult<ApiRoutes["GET /api/landlord/session"]['response']>>
     statement: {
       pdf(options?: RouteOptions<ApiRoutes["GET /api/landlord/statement/pdf"]['query']>): Promise<ApiResult<ApiRoutes["GET /api/landlord/statement/pdf"]['response']>>
     }
@@ -941,6 +956,7 @@ export interface RouteClient {
       show(params: ApiRoutes["GET /api/tenant/pay/:id"]['params'], options?: RouteOptions<ApiRoutes["GET /api/tenant/pay/:id"]['query']>): Promise<ApiResult<ApiRoutes["GET /api/tenant/pay/:id"]['response']>>
     }
     payments(options?: RouteOptions<ApiRoutes["GET /api/tenant/payments"]['query']>): Promise<ApiResult<ApiRoutes["GET /api/tenant/payments"]['response']>>
+    session(options?: RouteOptions<ApiRoutes["GET /api/tenant/session"]['query']>): Promise<ApiResult<ApiRoutes["GET /api/tenant/session"]['response']>>
     statement: {
       pdf(options?: RouteOptions<ApiRoutes["GET /api/tenant/statement/pdf"]['query']>): Promise<ApiResult<ApiRoutes["GET /api/tenant/statement/pdf"]['response']>>
     }

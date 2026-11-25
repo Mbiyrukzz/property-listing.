@@ -6,6 +6,7 @@ uses
   Auth
   Theme
   Site
+  Portal
 
 state
   mobileMenuOpen: false
@@ -74,6 +75,13 @@ template
         <a href="/admin" class="hidden md:inline-flex bb-nav-link gap-1.5"><IconLayoutGrid class="w-4 h-4" /> Admin</a>
 {{/if}}
         <a href="/dashboard" class="hidden sm:inline-flex tx-btn tx-btn-dark tx-btn-sm ml-1"><IconUserCircle class="w-4 h-4" /> My account</a>
+{{#else if Portal.signedIn()}}
+{{#if Portal.tenant}}
+        <a href="/tenant" class="hidden sm:inline-flex tx-btn tx-btn-dark tx-btn-sm ml-1" title="{{ Portal.tenant.name }}"><IconMobileMoney class="w-4 h-4" /> My rent account</a>
+{{/if}}
+{{#if Portal.landlord}}
+        <a href="/landlord" class="hidden sm:inline-flex tx-btn tx-btn-dark tx-btn-sm ml-1" title="{{ Portal.landlord.name }}"><IconBuildingOffice class="w-4 h-4" /> My properties</a>
+{{/if}}
 {{#else}}
         <a href="/login" class="hidden sm:inline-flex bb-nav-link">Log in</a>
         <a href="/register" class="hidden sm:inline-flex tx-btn tx-btn-primary tx-btn-sm ml-1">Create account</a>
@@ -120,6 +128,15 @@ template
           <a href="/admin" class="{{ sheetClass('/admin') }}"><IconLayoutGrid /> Admin</a>
 {{/if}}
           <button onclick="{{ Auth.logout() }}" class="bb-sheet-link"><IconLogout /> Log out</button>
+        </div>
+{{#else if Portal.signedIn()}}
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 px-1">
+{{#if Portal.tenant}}
+          <a href="/tenant" onclick="{{ closeMobileMenu() }}" class="tx-btn tx-btn-dark justify-center"><IconMobileMoney class="w-4 h-4" /> My rent account</a>
+{{/if}}
+{{#if Portal.landlord}}
+          <a href="/landlord" onclick="{{ closeMobileMenu() }}" class="tx-btn tx-btn-dark justify-center"><IconBuildingOffice class="w-4 h-4" /> My properties</a>
+{{/if}}
         </div>
 {{#else}}
         <div class="grid grid-cols-2 gap-2 px-1">

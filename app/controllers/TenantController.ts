@@ -61,6 +61,13 @@ const login = smsLogin<TenantIdentity>({
 });
 
 export class TenantController {
+    // Who is signed in, from the session alone (no HQ call): the site
+    // header asks on every page.
+    async session(req: TylixRequest, res: TylixResponse) {
+        const tenant = await currentTenant(req);
+        return res.json(tenant ? { signedIn: true, name: tenant.name } : { signedIn: false });
+    }
+
     async status(req: TylixRequest, res: TylixResponse) {
         if (!isConfigured()) return res.json({ enabled: false, signedIn: false });
         const tenant = await currentTenant(req);

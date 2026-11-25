@@ -1,0 +1,34 @@
+capability Portal
+
+// Who is signed in to the tenant or landlord portal (SMS sign-in, separate
+// from website accounts), so the header can show the portal instead of
+// "Log in / Create account". Each portal cookie only reaches its own API,
+// so both are asked. The portal pages call set() when someone signs in or out.
+
+state
+  tenant: null
+  landlord: null
+
+action
+  set(kind, who) {
+    if kind is "tenant" {
+      this.tenant = who ? { name: who.name ?? "" } : null
+    } else if kind is "landlord" {
+      this.landlord = who ? { name: who.name ?? "" } : null
+    }
+  }
+
+  signedIn() {
+    return Boolean(this.tenant or this.landlord)
+  }
+
+init
+  async {
+    const [t, l] = await Promise.all([useApi("/api/tenant/session"), useApi("/api/landlord/session")])
+    if t.ok and t.data.signedIn {
+      this.tenant = { name: t.data.name ?? "" }
+    }
+    if l.ok and l.data.signedIn {
+      this.landlord = { name: l.data.name ?? "" }
+    }
+  }

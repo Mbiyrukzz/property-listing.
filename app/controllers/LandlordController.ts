@@ -69,6 +69,13 @@ async function listingSlugs(propertyIds: number[]): Promise<Map<number, string>>
 }
 
 export class LandlordController {
+    // Who is signed in, from the session alone (no HQ call): the site
+    // header asks on every page.
+    async session(req: TylixRequest, res: TylixResponse) {
+        const landlord = await currentLandlord(req);
+        return res.json(landlord ? { signedIn: true, name: landlord.name } : { signedIn: false });
+    }
+
     async status(req: TylixRequest, res: TylixResponse) {
         if (!isConfigured()) return res.json({ enabled: false, signedIn: false });
         const landlord = await currentLandlord(req);

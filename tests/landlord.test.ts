@@ -204,6 +204,12 @@ test('a landlord signs in like a tenant and reads their portfolio, payouts and r
     assert.equal(status.summary.totals.vacant, 1)
     assert.ok('listing_slug' in status.summary.properties[0])
 
+    // The site header's check reads the session only, never HQ.
+    const callsBefore = hqCalls.length
+    res = await call('/api/landlord/session', { cookie })
+    assert.deepEqual(await res.json(), { signedIn: true, name: 'Test Landlord' })
+    assert.equal(hqCalls.length, callsBefore)
+
     res = await call('/api/landlord/units', { cookie })
     assert.equal(res.status, 200)
     const units = (await res.json()).data
@@ -243,6 +249,8 @@ test('a landlord signs in like a tenant and reads their portfolio, payouts and r
     assert.match(res.headers.get('set-cookie') ?? '', /bb_landlord=;.*Max-Age=0/i)
     res = await call('/api/landlord/units', { cookie })
     assert.equal(res.status, 403)
+    res = await call('/api/landlord/session', { cookie })
+    assert.deepEqual(await res.json(), { signedIn: false })
 })
 
 test('a made-up landlord cookie is refused', async () => {

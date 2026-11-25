@@ -6,6 +6,7 @@ title "Tenant portal | Barani Better Homes"
 
 uses
   Fmt
+  Portal
 
 state
   loading: true
@@ -166,6 +167,7 @@ action
 
   resetPortal() {
     this.signedIn = false
+    Portal.set("tenant", null)
     this.summary = null
     this.tenant = null
     this.invoices = []
@@ -191,6 +193,7 @@ action
       this.signedIn = result.data.signedIn
       this.ended = Boolean(result.data.ended)
       this.tenant = result.data.tenant ?? null
+      Portal.set("tenant", this.signedIn ? this.tenant : null)
       this.summary = result.data.summary ?? null
       if this.summary {
         this.payPhone = this.payPhone or this.summary.tenant.phone or ""

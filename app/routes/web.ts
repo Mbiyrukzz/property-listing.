@@ -46,6 +46,7 @@ export async function publicRoutes(router: Router) {
   // number and an SMS code, and every other route checks that tenant
   // session itself (app/services/TenantAuth).
   router.get('/api/tenant', (req, res) => tenant.status(req, res))
+  router.get('/api/tenant/session', (req, res) => tenant.session(req, res))
   router.post('/api/tenant/login', (req, res) => tenant.startLogin(req, res))
   router.post('/api/tenant/login/confirm', (req, res) => tenant.confirmLogin(req, res))
   router.post('/api/tenant/logout', (req, res) => tenant.logout(req, res))
@@ -63,6 +64,7 @@ export async function publicRoutes(router: Router) {
   // code, no website account), with its own session cookie that only
   // /api/landlord/* receives (app/services/LandlordAuth). Read-only.
   router.get('/api/landlord', (req, res) => landlord.status(req, res))
+  router.get('/api/landlord/session', (req, res) => landlord.session(req, res))
   router.post('/api/landlord/login', (req, res) => landlord.startLogin(req, res))
   router.post('/api/landlord/login/confirm', (req, res) => landlord.confirmLogin(req, res))
   router.post('/api/landlord/logout', (req, res) => landlord.logout(req, res))

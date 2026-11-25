@@ -210,6 +210,14 @@ test('a tenant signs in with account number and SMS code, without a website acco
     assert.equal(status.signedIn, true)
     assert.equal(status.summary.tenant.account_number, ACCOUNT)
 
+    // The site header's check reads the session only, never HQ.
+    const callsBefore = hqCalls.length
+    res = await call('/api/tenant/session', { cookie })
+    assert.deepEqual(await res.json(), { signedIn: true, name: 'Test Tenant' })
+    assert.equal(hqCalls.length, callsBefore)
+    res = await call('/api/tenant/session')
+    assert.deepEqual(await res.json(), { signedIn: false })
+
     res = await call('/api/tenant/invoices', { cookie })
     assert.equal(res.status, 200)
     assert.equal((await res.json()).data[0].id, 7)
@@ -252,6 +260,8 @@ test('a tenant signs in with account number and SMS code, without a website acco
     assert.match(res.headers.get('set-cookie') ?? '', /bb_tenant=;.*Max-Age=0/i)
     res = await call('/api/tenant/invoices', { cookie })
     assert.equal(res.status, 403)
+    res = await call('/api/tenant/session', { cookie })
+    assert.deepEqual(await res.json(), { signedIn: false })
 })
 
 test('a made-up session cookie is refused', async () => {

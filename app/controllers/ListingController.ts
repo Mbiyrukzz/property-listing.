@@ -1,5 +1,9 @@
 // Public listing API: search, details, homepage sections and vacant units.
 // Only published listings are ever returned.
+//
+// Property listings (search, homepage, similar) are Barani Better Homes' own,
+// created in the admin. Properman-synced properties only feed the vacant
+// units list; their page stays reachable so a vacant unit card can open it.
 
 import type { TylixRequest, TylixResponse } from "@tylix/core";
 import { createRateLimiter } from "@tylix/core";
@@ -36,6 +40,8 @@ export interface ListingFilters {
     beds?: number;
     featured?: boolean;
     vacant?: boolean;
+    // Leave out Properman-synced properties (they only appear as vacant units).
+    own?: boolean;
 }
 
 function text(value: unknown, maxLength = 100): string {
@@ -84,6 +90,7 @@ function filtered(f: ListingFilters) {
     if (f.beds !== undefined) query = query.where("bedrooms", ">=", f.beds);
     if (f.featured) query = query.where("is_featured", 1);
     if (f.vacant) query = query.where("vacant_units", ">", 0);
+    if (f.own) query = query.where("source", "!=", "properman");
     return query;
 }
 
@@ -116,7 +123,7 @@ async function agentCard(agentId: number | null) {
 
 export class ListingController {
     async index(req: TylixRequest, res: TylixResponse) {
-        const f = readFilters(req.query ?? {});
+        const f = { ...readFilters(req.query ?? {}), own: true };
         const page = Math.max(1, Math.floor(toNumber(req.query?.page, 1)));
         const limit = Math.min(48, Math.max(1, Math.floor(toNumber(req.query?.limit, PAGE_SIZE))));
         const sort = text(req.query?.sort);
@@ -131,12 +138,12 @@ export class ListingController {
     }
 
     async home(_req: TylixRequest, res: TylixResponse) {
-        let featured = (await filtered({ featured: true }).orderBy("published_at", "DESC").limit(6).get()) as ListingRow[];
-        const recent = (await filtered({}).orderBy("published_at", "DESC").orderBy("id", "DESC").limit(8).get()) as ListingRow[];
+        let featured = (await filtered({ featured: true, own: true }).orderBy("published_at", "DESC").limit(6).get()) as ListingRow[];
+        const recent = (await filtered({ own: true }).orderBy("published_at", "DESC").orderBy("id", "DESC").limit(8).get()) as ListingRow[];
         if (featured.length === 0) featured = recent.slice(0, 6);
 
         // One read for every count (the ORM's count() reads the rows anyway).
-        const visible = (await filtered({}).get()) as ListingRow[];
+        const visible = (await filtered({ own: true }).get()) as ListingRow[];
         const counts: Record<string, number> = {};
         for (const c of CATEGORIES) counts[c.key] = visible.filter((l) => l.category === c.key).length;
         const purposeCounts = {
@@ -164,7 +171,7 @@ export class ListingController {
         }
 
         const units = (await ListingUnit.where("property_id", row.id).where("is_listed", 1).orderBy("rent", "ASC").get()) as UnitRow[];
-        const similar = (await filtered({ category: row.category, purpose: row.purpose })
+        const similar = (await filtered({ category: row.category, purpose: row.purpose, own: true })
             .where("id", "!=", row.id)
             .orderBy("published_at", "DESC")
             .limit(3)
