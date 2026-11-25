@@ -5,3 +5,4 @@ dist/
 storage/logs/*.log
 .env.*
 !.env.example
+public/tailwind.css
