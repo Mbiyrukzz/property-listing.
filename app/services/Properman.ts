@@ -127,8 +127,10 @@ export const Properman = {
     listProperties: () => call<{ data: PropermanProperty[] }>("GET", "/properties"),
     getProperty: (id: number) => call<{ data: PropermanProperty }>("GET", `/properties/${id}`),
 
-    startTenantVerification: (accountNumber: string, phone: string) =>
-        call("POST", "/tenants/verification", { account_number: accountNumber, phone }),
+    // deliverBy "caller": Properman returns the code (in `delivery`) for this
+    // app to send by its own SMS gateway, instead of texting it itself.
+    startTenantVerification: (accountNumber: string, phone: string, deliverBy: "properman" | "caller" = "properman") =>
+        call("POST", "/tenants/verification", { account_number: accountNumber, phone, deliver_by: deliverBy }),
     confirmTenantVerification: (accountNumber: string, phone: string, code: string) =>
         call("POST", "/tenants/verification/confirm", { account_number: accountNumber, phone, code }),
 

@@ -80,7 +80,7 @@ template
     <h1 class="text-[1.75rem] leading-tight sm:text-3xl font-bold tracking-tight">Vacant units</h1>
     <p class="text-muted mt-2 max-w-2xl mb-6">Every unit here is empty today. Units drop off this list on their own when a tenant moves in, so there's no chasing listings that went months ago.</p>
 
-    <form onsubmit.prevent="{{ apply() }}" class="tx-panel p-3 sm:p-4 mb-6 grid grid-cols-2 md:grid-cols-[1fr_180px_160px_140px_auto] gap-2 items-end" role="search" aria-label="Filter vacant units">
+    <form onsubmit.prevent="{{ apply() }}" class="rounded-md border border-line bg-panel p-3 sm:p-4 mb-6 grid grid-cols-2 md:grid-cols-[1fr_180px_160px_140px_auto] gap-2 items-end" role="search" aria-label="Filter vacant units">
       <div class="col-span-2 md:col-span-1">
         <label class="tx-label" for="vu-q">Area or building</label>
         <input id="vu-q" class="tx-input !mb-0" placeholder="e.g. Vipingo" bind:value="{{ q }}" />
@@ -116,27 +116,37 @@ template
 {{#if failed}}
     <div class="tx-alert tx-alert-error"><p class="text-sm">Vacant units couldn't be loaded. <button class="underline" onclick="{{ load() }}">Try again</button></p></div>
 {{#else if not loading and units.length is 0}}
-    <div class="rounded-xl border border-dashed border-line-strong p-10 text-center">
+    <div class="rounded-md border border-dashed border-line-strong p-10 text-center">
       <h2 class="font-semibold mb-1">No vacant units match</h2>
       <p class="text-sm text-muted mb-4">Try a higher rent or another area, or leave your details and we'll call when one opens up.</p>
       <a href="/contact" class="tx-btn tx-btn-outline tx-btn-sm">Leave my details</a>
     </div>
 {{#else}}
-    <div class="{{ 'grid grid-cols-1 md:grid-cols-2 gap-3 ' + (loading ? 'opacity-60' : '') }}">
+    <div class="{{ 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 transition-opacity ' + (loading ? 'opacity-60' : '') }}">
 {{#each u in units}}
-      <a href="{{ `/properties/${u.listing.slug}` }}" class="tx-panel p-3 flex gap-4 hover:border-line-strong">
-        <div class="w-28 h-24 sm:w-36 sm:h-28 rounded-lg overflow-hidden bg-well shrink-0">
+      <a href="{{ `/properties/${u.listing.slug}` }}" class="group flex flex-col overflow-hidden rounded-md border border-line bg-panel hover:border-line-strong hover:shadow-md transition">
+        <div class="relative aspect-[4/3] bg-well overflow-hidden">
 {{#if u.cover}}
-          <img src="{{ u.cover }}" alt="" class="w-full h-full object-cover" loading="lazy" />
+          <img src="{{ u.cover }}" alt="" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" loading="lazy" />
 {{#else}}
-          <div class="bb-photo-empty"><IconHome class="w-7 h-7" /></div>
+          <div class="bb-photo-empty"><IconHome class="w-8 h-8" /></div>
 {{/if}}
+          <span class="absolute top-2 left-2 rounded-md bg-emerald-600 text-white text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5">Vacant</span>
         </div>
-        <div class="min-w-0 flex flex-col gap-1">
-          <p class="font-semibold">{{ Fmt.price(u.rent, "rent") }}</p>
-          <p class="text-sm font-medium truncate">{{ u.listing.title }} · {{ u.name }}</p>
-          <p class="text-sm text-soft flex items-center gap-1.5"><IconBed class="w-4 h-4 text-muted" /> {{ u.type }}{{ u.isFurnished ? " · furnished" : "" }}</p>
-          <p class="text-xs text-muted flex items-center gap-1"><IconMapPin class="w-3.5 h-3.5" /> {{ u.listing.location }}</p>
+        <div class="flex flex-col gap-2 p-4 flex-1">
+          <p class="text-lg font-bold leading-tight">{{ Fmt.price(u.rent, "rent") }}</p>
+          <p class="text-sm text-soft flex items-start gap-1.5"><IconMapPin class="w-4 h-4 text-muted shrink-0 mt-0.5" /> <span class="line-clamp-1">{{ u.listing.location or "Location on request" }}</span></p>
+{{#if u.summary}}
+          <p class="text-sm text-muted line-clamp-3">{{ u.summary }}</p>
+{{/if}}
+          <div class="mt-auto pt-2 flex flex-wrap items-center gap-1.5">
+{{#if u.type}}
+            <span class="inline-flex items-center gap-1 rounded-md bg-well border border-line text-xs text-soft px-2 py-1"><IconBed class="w-3.5 h-3.5" /> {{ u.type }}</span>
+{{/if}}
+{{#if u.isFurnished}}
+            <span class="inline-flex items-center rounded-md bg-well border border-line text-xs text-soft px-2 py-1">Furnished</span>
+{{/if}}
+          </div>
         </div>
       </a>
 {{/each}}

@@ -233,7 +233,10 @@ export class ListingController {
             const listing = byId.get(u.property_id) as ListingRow;
             const card = presentCard(listing);
             const unit = presentUnit(u);
-            return { ...unit, cover: unit.cover ?? card.cover, listing: card };
+            // A short plain-text description: the cards show location, rent and
+            // this, not the property's name.
+            const summary = String(listing.description ?? "").replace(/\s+/g, " ").trim().slice(0, 220);
+            return { ...unit, cover: unit.cover ?? card.cover, summary, listing: card };
         });
         return { items, total: units.length };
     }

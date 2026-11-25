@@ -15,6 +15,7 @@ import { createRateLimiter } from "@tylix/core";
 import { TenantLink } from "../models/TenantLink.js";
 import { RentPayment } from "../models/RentPayment.js";
 import { Properman, isConfigured } from "../services/Properman.js";
+import { sendSms, smsConfigured } from "../services/Sms.js";
 import { validatePayment, validateTenantLink } from "../validators/ListingValidators.js";
 
 type Row = Record<string, any>;
@@ -79,15 +80,32 @@ export class TenantController {
         }
 
         try {
+            // With Ashmif set up, this app texts the code itself; otherwise
+            // Properman sends it through its own SMS provider.
+            const ownSms = smsConfigured();
             const reply = await Properman.startTenantVerification(
                 String(req.body.account_number).trim(),
                 String(req.body.phone).replace(/[\s-]/g, ""),
+                ownSms ? "caller" : "properman",
             );
             if (reply.status === 429) {
                 res.status(429);
                 return res.json({ error: "Too many attempts. Wait a few minutes and try again." });
             }
             if (!reply.ok) return unavailable(res);
+
+            // `delivery` is only present when the details matched a tenancy
+            // and a fresh code was issued. It never goes back to the browser,
+            // so the reply below is the same either way.
+            const delivery = reply.data?.delivery;
+            if (ownSms && delivery?.code && delivery?.phone) {
+                const ttl = Number(delivery.ttl_minutes) || 10;
+                const sent = await sendSms(
+                    String(delivery.phone),
+                    `Your Barani Better Homes verification code is ${delivery.code}. It expires in ${ttl} minutes. Do not share it.`,
+                );
+                if (!sent) console.error("[tenant] verification SMS was not delivered");
+            }
             return res.json({
                 sent: true,
                 message: "If those details match your tenancy, we've sent a 6-digit code by SMS to the phone your landlord has on file.",

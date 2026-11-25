@@ -139,18 +139,18 @@ template
                 <span class="bb-chip bb-chip-ok"><span class="bb-dot bb-dot-ok bb-pulse"></span> Live</span>
               </div>
 {{#if loading}}
-              <div class="space-y-2"><div class="h-[68px] rounded-2xl bg-well animate-pulse"></div><div class="h-[68px] rounded-2xl bg-well animate-pulse"></div><div class="h-[68px] rounded-2xl bg-well animate-pulse"></div></div>
+              <div class="space-y-2"><div class="h-[68px] rounded-md bg-well animate-pulse"></div><div class="h-[68px] rounded-md bg-well animate-pulse"></div><div class="h-[68px] rounded-md bg-well animate-pulse"></div></div>
 {{#else if vacantUnits.length is 0}}
               <p class="text-sm text-muted rounded-2xl bg-raised p-4">Every unit is let right now. New vacancies appear here the day they open up.</p>
 {{#else}}
               <ul class="space-y-2">
 {{#each u in heroUnits}}
                 <li>
-                  <a href="{{ `/properties/${u.listing.slug}` }}" class="group flex items-center gap-3 rounded-2xl border border-line p-3 hover:border-brand/40 hover:bg-raised transition-colors">
+                  <a href="{{ `/properties/${u.listing.slug}` }}" class="group flex items-center gap-3 rounded-md border border-line p-3 hover:border-brand/40 hover:bg-raised transition-colors">
                     <span class="bb-icon-tile bb-icon-tile-sm bb-tint-lilac"><IconHome /></span>
                     <span class="min-w-0 flex-1">
-                      <span class="block text-sm font-semibold truncate">{{ u.listing.title }} · {{ u.name }}</span>
-                      <span class="block text-xs text-muted truncate">{{ u.type }} · {{ u.listing.location }}</span>
+                      <span class="block text-sm font-semibold truncate">{{ u.listing.location or "Location on request" }}</span>
+                      <span class="block text-xs text-muted truncate">{{ u.type }}{{ u.isFurnished ? " · furnished" : "" }}</span>
                     </span>
                     <span class="text-right">
                       <span class="block text-sm font-bold whitespace-nowrap">{{ Fmt.price(u.rent, "rent") }}</span>
