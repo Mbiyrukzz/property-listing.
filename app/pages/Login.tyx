@@ -17,7 +17,7 @@ state
   perks: [
     "Save properties and get back to them anywhere",
     "Book viewings and follow your applications",
-    "Tenants: see your balance and pay rent by M-Pesa"
+    "Get back to the listings you viewed"
   ]
 
 action
@@ -188,6 +188,9 @@ template
 
           <p class="text-sm text-muted text-center mt-6">
             Need an account? <a href="{{ next is '/dashboard' ? '/register' : '/register?next=' + encodeURIComponent(next) }}" class="tx-link">Sign up</a>
+          </p>
+          <p class="text-sm text-muted text-center mt-2">
+            Renting through us? <a href="/tenant" class="tx-link">Sign in to the tenant portal</a> with your account number, no account needed.
           </p>
         </div>
       </div>

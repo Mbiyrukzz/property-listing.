@@ -1,12 +1,8 @@
 page TenantPortal
 
-import AccountNav from "./components/AccountNav"
-import { IconKey, IconMobileMoney, IconReceipt, IconCheckCircle, IconExclamationTriangle, IconExternalLink, IconUnlink, IconRefresh } from "tylix-icons"
+import { IconKey, IconMobileMoney, IconReceipt, IconCheckCircle, IconCheck, IconExclamationTriangle, IconExternalLink, IconRefresh, IconLogout, IconDocumentText, IconDownload } from "tylix-icons"
 
 title "Tenant portal | Barani Better Homes"
-
-needs
-  Auth
 
 uses
   Fmt
@@ -14,18 +10,19 @@ uses
 state
   loading: true
   enabled: true
-  linked: false
-  stale: false
-  staleName: ""
-  summary: null
+  signedIn: false
+  ended: false
   unreachable: false
+  tenant: null
+  summary: null
   step: "details"
   accountNumber: ""
-  linkPhone: ""
+  loginPhone: ""
   code: ""
-  linkErrors: {}
-  linkMessage: ""
-  linkBusy: false
+  loginErrors: {}
+  loginMessage: ""
+  loginBusy: false
+  resendAt: 0
   invoices: []
   receipts: []
   requests: []
@@ -37,6 +34,15 @@ state
   payState: ""
   payId: null
   polls: 0
+  preset: "6m"
+  statementFrom: ""
+  statementTo: ""
+  perks: [
+    "No website account needed, just your account number and phone",
+    "Check your balance and every invoice",
+    "Download invoices and account statements as PDF",
+    "Pay rent by M-Pesa from your phone"
+  ]
 
 computed
   balances() {
@@ -47,8 +53,21 @@ computed
     return this.balances ? this.balances.total : 0
   }
 
-  openInvoices() {
-    return this.invoices.filter(i => i.balance > 0)
+  statementError() {
+    if not this.statementFrom or not this.statementTo {
+      return "Choose a start and end date."
+    }
+    if this.statementFrom > this.statementTo {
+      return "The start date must be before the end date."
+    }
+    if this.statementFrom > this.today() {
+      return "The start date can't be in the future."
+    }
+    return ""
+  }
+
+  statementUrl() {
+    return "/api/tenant/statement/pdf?from=" + encodeURIComponent(this.statementFrom) + "&to=" + encodeURIComponent(this.statementTo)
   }
 
 action
@@ -57,30 +76,102 @@ action
     return Array.isArray(list) and list.length > 0 ? list[0] : ""
   }
 
+  // YYYY-MM-DD in the visitor's own calendar.
+  isoDate(d) {
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, "0")
+    const day = String(d.getDate()).padStart(2, "0")
+    return y + "-" + m + "-" + day
+  }
+
+  today() {
+    return this.isoDate(new Date())
+  }
+
+  applyPreset(value) {
+    this.preset = value
+    const now = new Date()
+    const y = now.getFullYear()
+    const m = now.getMonth()
+    if value is "custom" {
+      return null
+    }
+    this.statementTo = this.isoDate(now)
+    if value is "month" {
+      this.statementFrom = this.isoDate(new Date(y, m, 1))
+    } else if value is "3m" {
+      this.statementFrom = this.isoDate(new Date(y, m - 2, 1))
+    } else if value is "6m" {
+      this.statementFrom = this.isoDate(new Date(y, m - 5, 1))
+    } else if value is "12m" {
+      this.statementFrom = this.isoDate(new Date(y, m - 11, 1))
+    } else if value is "year" {
+      this.statementFrom = this.isoDate(new Date(y, 0, 1))
+    } else if value is "last-year" {
+      this.statementFrom = this.isoDate(new Date(y - 1, 0, 1))
+      this.statementTo = this.isoDate(new Date(y - 1, 11, 31))
+    }
+  }
+
+  setStatementDate(field, value) {
+    this[field] = value
+    this.preset = "custom"
+  }
+
+  invoicePdf(invoice, download) {
+    return "/api/tenant/invoices/" + invoice.id + "/pdf" + (download ? "?download=1" : "")
+  }
+
+  // Any call can find the session gone (expired, or signed out elsewhere).
+  sessionEnded(result) {
+    if result.status is 403 and result.data?.code is "TENANT_SIGNED_OUT" {
+      this.resetPortal()
+      this.loginMessage = "Your session ended. Sign in again to continue."
+      return true
+    }
+    return false
+  }
+
+  resetPortal() {
+    this.signedIn = false
+    this.summary = null
+    this.tenant = null
+    this.invoices = []
+    this.receipts = []
+    this.requests = []
+    this.payState = ""
+    this.payMessage = ""
+    this.payId = null
+    this.step = "details"
+    this.code = ""
+  }
+
   async load() {
     this.loading = true
     this.unreachable = false
     const result = await useApi("/api/tenant")
     if result.ok {
       this.enabled = result.data.enabled
-      this.linked = result.data.linked
-      this.stale = Boolean(result.data.stale)
-      this.staleName = result.data.name ?? ""
+      this.signedIn = result.data.signedIn
+      this.ended = Boolean(result.data.ended)
+      this.tenant = result.data.tenant ?? null
       this.summary = result.data.summary ?? null
       if this.summary {
         this.payPhone = this.payPhone or this.summary.tenant.phone or ""
         this.payAmount = this.payAmount or (this.summary.balances.total > 0 ? this.summary.balances.total : "")
-        await this.loadStatements()
+        await this.loadAccount()
       }
     } else if result.status is 503 {
       this.unreachable = true
-      this.linked = true
     }
     this.loading = false
   }
 
-  async loadStatements() {
+  async loadAccount() {
     const [inv, pay] = await Promise.all([useApi("/api/tenant/invoices"), useApi("/api/tenant/payments")])
+    if this.sessionEnded(inv) or this.sessionEnded(pay) {
+      return null
+    }
     if inv.ok {
       this.invoices = inv.data.data
     }
@@ -91,50 +182,65 @@ action
   }
 
   async sendCode() {
-    this.linkBusy = true
-    this.linkErrors = {}
-    this.linkMessage = ""
-    const result = await useApi("/api/tenant/link", { method: "POST", body: { account_number: this.accountNumber, phone: this.linkPhone } })
-    this.linkBusy = false
+    if this.loginBusy {
+      return null
+    }
+    this.loginBusy = true
+    this.loginErrors = {}
+    this.loginMessage = ""
+    this.ended = false
+    const result = await useApi("/api/tenant/login", { method: "POST", body: { account_number: this.accountNumber, phone: this.loginPhone } })
+    this.loginBusy = false
     if result.ok {
       this.step = "code"
-      this.linkMessage = result.data.message
+      this.code = ""
+      this.loginMessage = result.data.message
+      this.resendAt = Date.now() + 60000
     } else if result.status is 422 {
-      this.linkErrors = result.data.errors ?? {}
+      this.loginErrors = result.data.errors ?? {}
     } else {
-      this.linkMessage = Fmt.firstError(result)
+      this.loginMessage = Fmt.firstError(result)
     }
+  }
+
+  // Properman sends at most one code a minute per tenancy.
+  async resend() {
+    if Date.now() < this.resendAt {
+      this.loginMessage = "Wait a minute before asking for another code."
+      return null
+    }
+    await this.sendCode()
   }
 
   async confirmCode() {
-    this.linkBusy = true
-    this.linkErrors = {}
-    const result = await useApi("/api/tenant/link/confirm", {
+    if this.loginBusy {
+      return null
+    }
+    this.loginBusy = true
+    this.loginErrors = {}
+    const result = await useApi("/api/tenant/login/confirm", {
       method: "POST",
-      body: { account_number: this.accountNumber, phone: this.linkPhone, code: this.code.trim() }
+      body: { account_number: this.accountNumber, phone: this.loginPhone, code: this.code.trim() }
     })
-    this.linkBusy = false
+    this.loginBusy = false
     if result.ok {
       this.step = "details"
       this.code = ""
+      this.loginMessage = ""
       await this.load()
     } else if result.status is 422 {
-      this.linkErrors = result.data.errors ?? {}
+      this.loginErrors = result.data.errors ?? {}
     } else {
-      this.linkMessage = Fmt.firstError(result)
+      this.loginMessage = Fmt.firstError(result)
     }
   }
 
-  async unlink() {
-    if not confirm("Unlink this tenancy from your account? You can link it again later.") {
-      return null
-    }
-    await useApi("/api/tenant/link", { method: "DELETE" })
-    this.summary = null
-    this.linked = false
-    this.stale = false
-    this.invoices = []
-    this.receipts = []
+  async signOut() {
+    await useApi("/api/tenant/logout", { method: "POST" })
+    this.resetPortal()
+    this.accountNumber = ""
+    this.loginPhone = ""
+    this.loginMessage = ""
   }
 
   async pay() {
@@ -146,6 +252,9 @@ action
     this.payMessage = ""
     const result = await useApi("/api/tenant/pay", { method: "POST", body: { phone: this.payPhone, amount: Number(this.payAmount) } })
     this.payBusy = false
+    if this.sessionEnded(result) {
+      return null
+    }
     if result.ok {
       this.payState = "pending"
       this.payId = result.data.data.id
@@ -167,6 +276,9 @@ action
     }
     this.polls = this.polls + 1
     const result = await useApi(`/api/tenant/pay/${this.payId}`)
+    if this.sessionEnded(result) {
+      return null
+    }
     if result.ok {
       const s = result.data.data.status
       if s is "completed" {
@@ -201,7 +313,7 @@ action
     if type is "income_shared_utility" {
       return "Utilities"
     }
-    if type is "income_lockfee" {
+    if type is "income_lockfee" or type is "lock_fee" {
       return "Late fee"
     }
     if type is "income_agentfee" {
@@ -212,180 +324,243 @@ action
 
 onMount
   async {
-    if not Auth.user {
-      window.location.href = "/login?next=/tenant"
-      return null
-    }
+    this.applyPreset("6m")
     await this.load()
   }
 
 template
-{{#if Auth.user}}
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-5 sm:py-8 grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-4 lg:gap-8">
-    <AccountNav current="tenant" />
-    <div class="min-w-0">
-      <h1 class="text-2xl font-bold tracking-tight mb-1">Tenant portal</h1>
-      <p class="text-sm text-muted mb-6">Your rent account, straight from your landlord's records.</p>
-
 {{#if loading}}
-      <div class="bb-card h-48 animate-pulse" data-page-loader="true"></div>
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+    <div class="bb-card h-48 animate-pulse" data-page-loader="true"></div>
+  </div>
 {{#else if not enabled}}
-      <div class="tx-alert tx-alert-info"><p class="text-sm">The tenant portal isn't switched on yet. Please contact the office for your balance.</p></div>
+  <div class="max-w-2xl mx-auto px-4 sm:px-6 py-10">
+    <h1 class="text-2xl font-bold tracking-tight mb-4">Tenant portal</h1>
+    <div class="tx-alert tx-alert-info"><p class="text-sm">The tenant portal isn't switched on yet. Please contact the office for your balance.</p></div>
+  </div>
 {{#else if unreachable}}
-      <div class="tx-alert tx-alert-error flex items-center justify-between gap-3">
-        <p class="text-sm">We can't reach the rent system right now. Your account is safe; please try again shortly.</p>
-        <button class="tx-btn tx-btn-outline tx-btn-sm" onclick="{{ load() }}"><IconRefresh class="w-4 h-4" /> Retry</button>
+  <div class="max-w-2xl mx-auto px-4 sm:px-6 py-10">
+    <h1 class="text-2xl font-bold tracking-tight mb-4">Tenant portal</h1>
+    <div class="tx-alert tx-alert-error flex items-center justify-between gap-3">
+      <p class="text-sm">We can't reach the rent system right now. Your account is safe; please try again shortly.</p>
+      <button class="tx-btn tx-btn-outline tx-btn-sm" onclick="{{ load() }}"><IconRefresh class="w-4 h-4" /> Retry</button>
+    </div>
+  </div>
+{{#else if not signedIn}}
+  <div class="flex items-center justify-center px-3 sm:px-6 py-6 sm:py-16">
+    <div class="tx-auth tx-glow">
+      <div class="tx-auth-aside">
+        <p class="tx-eyebrow mb-5">Tenant portal</p>
+        <h2 class="text-3xl font-bold tracking-tight mb-3">Your rent account</h2>
+        <p class="text-sm text-muted mb-8 leading-relaxed">Straight from your landlord's records, whenever you need it.</p>
+        <ul class="space-y-3">
+{{#each perk in perks}}
+          <li class="flex items-start gap-2.5 text-sm text-soft">
+            <span class="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center shrink-0"><IconCheck class="w-3 h-3" /></span>
+            {{ perk }}
+          </li>
+{{/each}}
+        </ul>
       </div>
-{{#else if stale}}
-      <div class="tx-panel p-5">
-        <p class="text-sm mb-4">The tenancy linked to your account ({{ staleName }}) is no longer active. If you've moved to a new unit, unlink it and link the new one.</p>
-        <button class="tx-btn tx-btn-outline tx-btn-sm" onclick="{{ unlink() }}"><IconUnlink class="w-4 h-4" /> Unlink</button>
-      </div>
-{{#else if not linked}}
-      <div class="tx-panel p-5 sm:p-6 max-w-lg">
-        <IconKey class="w-6 h-6 text-brand mb-3" />
-        <h2 class="font-semibold mb-1">Link your tenancy</h2>
-        <p class="text-sm text-muted mb-5">Enter the account number on your rent invoices or SMS reminders, and the phone number your landlord has for you. We'll text that phone a 6-digit code.</p>
-{{#if linkMessage}}<div class="tx-alert tx-alert-info mb-4" role="status"><p class="text-sm">{{ linkMessage }}</p></div>{{/if}}
+
+      <div class="tx-auth-form">
+        <div class="w-full max-w-sm">
+          <IconKey class="w-6 h-6 text-brand mb-3" />
+          <h1 class="text-2xl font-bold tracking-tight mb-1">Tenant sign in</h1>
 {{#if step is "details"}}
-        <form onsubmit.prevent="{{ sendCode() }}" novalidate>
-          <label class="tx-label" for="tn-account">Account number</label>
-          <input id="tn-account" class="tx-input" inputmode="numeric" autocomplete="off" bind:value="{{ accountNumber }}" aria-invalid="{{ fieldError(linkErrors, 'account_number') ? 'true' : 'false' }}" />
-{{#if fieldError(linkErrors, "account_number")}}<p class="text-xs text-coral -mt-3 mb-3">{{ fieldError(linkErrors, "account_number") }}</p>{{/if}}
-          <label class="tx-label" for="tn-phone">Phone number on file</label>
-          <input id="tn-phone" class="tx-input" type="tel" placeholder="0712 345 678" bind:value="{{ linkPhone }}" aria-invalid="{{ fieldError(linkErrors, 'phone') ? 'true' : 'false' }}" />
-{{#if fieldError(linkErrors, "phone")}}<p class="text-xs text-coral -mt-3 mb-3">{{ fieldError(linkErrors, "phone") }}</p>{{/if}}
-          <button type="submit" class="tx-btn tx-btn-primary" disabled="{{ linkBusy }}">{{ linkBusy ? "Sending…" : "Text me a code" }}</button>
-        </form>
+          <p class="text-sm text-muted mb-6">Enter the account number on your rent invoices or SMS reminders, and the phone number your landlord has for you. We'll text that phone a 6-digit code.</p>
 {{#else}}
-        <form onsubmit.prevent="{{ confirmCode() }}" novalidate>
-          <label class="tx-label" for="tn-code">6-digit code</label>
-          <input id="tn-code" class="tx-input tracking-[0.4em] text-lg" inputmode="numeric" autocomplete="one-time-code" maxlength="6" bind:value="{{ code }}" aria-invalid="{{ fieldError(linkErrors, 'code') ? 'true' : 'false' }}" />
-{{#if fieldError(linkErrors, "code")}}<p class="text-xs text-coral -mt-3 mb-3">{{ fieldError(linkErrors, "code") }}</p>{{/if}}
-          <div class="flex flex-wrap gap-2">
-            <button type="submit" class="tx-btn tx-btn-primary" disabled="{{ linkBusy }}">{{ linkBusy ? "Checking…" : "Link tenancy" }}</button>
-            <button type="button" class="tx-btn tx-btn-ghost" onclick="{{ step = 'details' }}">Use different details</button>
-          </div>
-        </form>
+          <p class="text-sm text-muted mb-6">Enter the 6-digit code we sent to the phone on file for account {{ accountNumber }}.</p>
 {{/if}}
-      </div>
+{{#if ended}}
+          <div class="tx-alert tx-alert-info mb-4" role="status"><p class="text-sm">The tenancy for {{ tenant ? tenant.name : "that account" }} is no longer active. If you've moved to a new unit, sign in with its account number.</p></div>
+{{/if}}
+{{#if loginMessage}}
+          <div class="tx-alert tx-alert-info mb-4" role="status" aria-live="polite"><p class="text-sm">{{ loginMessage }}</p></div>
+{{/if}}
+{{#if step is "details"}}
+          <form onsubmit.prevent="{{ sendCode() }}" novalidate>
+            <label class="tx-label" for="tn-account">Account number</label>
+            <input id="tn-account" class="tx-input" autocomplete="off" autocapitalize="characters" autofocus bind:value="{{ accountNumber }}" aria-invalid="{{ fieldError(loginErrors, 'account_number') ? 'true' : 'false' }}" />
+{{#if fieldError(loginErrors, "account_number")}}<p class="text-xs text-coral -mt-3 mb-3">{{ fieldError(loginErrors, "account_number") }}</p>{{/if}}
+            <label class="tx-label" for="tn-phone">Phone number on file</label>
+            <input id="tn-phone" class="tx-input" type="tel" autocomplete="tel" placeholder="0712 345 678" bind:value="{{ loginPhone }}" aria-invalid="{{ fieldError(loginErrors, 'phone') ? 'true' : 'false' }}" />
+{{#if fieldError(loginErrors, "phone")}}<p class="text-xs text-coral -mt-3 mb-3">{{ fieldError(loginErrors, "phone") }}</p>{{/if}}
+            <button type="submit" class="tx-btn tx-btn-primary tx-btn-block justify-center" disabled="{{ loginBusy }}">{{ loginBusy ? "Sending…" : "Text me a code" }}</button>
+          </form>
 {{#else}}
-      <div class="grid xl:grid-cols-[1fr_360px] gap-6 items-start">
-        <div class="flex flex-col gap-6 min-w-0">
-          <section class="tx-panel p-5">
-            <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
-              <div>
-                <p class="text-sm text-muted">{{ summary.tenant.name }} · account {{ summary.tenant.account_number }}</p>
-{{#if summary.unit}}
-                <p class="font-semibold">{{ summary.property ? summary.property.name + " · " : "" }}{{ summary.unit.name }}</p>
-                <p class="text-sm text-muted">{{ summary.unit.type }} · rent {{ Fmt.price(summary.unit.rent, "rent") }}</p>
-{{/if}}
-{{#if summary.lease}}<p class="text-xs text-muted mt-1">Lease {{ Fmt.date(summary.lease.start_date) }} – {{ Fmt.date(summary.lease.end_date) }}</p>{{/if}}
-              </div>
-              <button class="tx-btn tx-btn-ghost tx-btn-sm" onclick="{{ unlink() }}"><IconUnlink class="w-4 h-4" /> Unlink</button>
+          <form onsubmit.prevent="{{ confirmCode() }}" novalidate>
+            <label class="tx-label" for="tn-code">6-digit code</label>
+            <input id="tn-code" class="tx-input tracking-[0.4em] text-lg" inputmode="numeric" autocomplete="one-time-code" maxlength="6" autofocus bind:value="{{ code }}" aria-invalid="{{ fieldError(loginErrors, 'code') ? 'true' : 'false' }}" />
+{{#if fieldError(loginErrors, "code")}}<p class="text-xs text-coral -mt-3 mb-3">{{ fieldError(loginErrors, "code") }}</p>{{/if}}
+            <button type="submit" class="tx-btn tx-btn-primary tx-btn-block justify-center" disabled="{{ loginBusy }}">{{ loginBusy ? "Checking…" : "Sign in" }}</button>
+            <div class="flex flex-wrap justify-between gap-2 mt-4 text-sm">
+              <button type="button" class="tx-link" onclick="{{ step = 'details' }}">Use different details</button>
+              <button type="button" class="tx-link" disabled="{{ loginBusy }}" onclick="{{ resend() }}">Send a new code</button>
             </div>
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div class="tx-well p-3"><p class="text-xs text-muted">Total due</p><p class="{{ 'text-xl font-semibold ' + (owing > 0 ? 'text-coral' : 'text-mint') }}">{{ Fmt.kes(owing) }}</p></div>
-              <div class="tx-well p-3"><p class="text-xs text-muted">Rent</p><p class="font-semibold">{{ Fmt.kes(balances.rent) }}</p></div>
-              <div class="tx-well p-3"><p class="text-xs text-muted">Utilities</p><p class="font-semibold">{{ Fmt.kes(balances.utilities) }}</p></div>
-              <div class="tx-well p-3"><p class="text-xs text-muted">Wallet credit</p><p class="font-semibold">{{ Fmt.kes(summary.wallet_balance) }}</p></div>
-            </div>
-{{#if balances.deposit > 0 or balances.lock_fee > 0 or balances.agent_fee > 0}}
-            <p class="text-xs text-muted mt-3">Also due: {{ balances.deposit > 0 ? "deposit " + Fmt.kes(balances.deposit) + " " : "" }}{{ balances.lock_fee > 0 ? "· late fees " + Fmt.kes(balances.lock_fee) + " " : "" }}{{ balances.agent_fee > 0 ? "· agent fee " + Fmt.kes(balances.agent_fee) : "" }}</p>
+          </form>
 {{/if}}
-          </section>
-
-          <section class="tx-panel">
-            <h2 class="font-semibold p-4 border-b border-line">Invoices</h2>
-{{#if invoices.length is 0}}
-            <p class="p-4 text-sm text-muted">No invoices yet.</p>
-{{#else}}
-            <div class="overflow-x-auto">
-              <table class="bb-table">
-                <thead><tr><th>Date</th><th>For</th><th>Amount</th><th>Balance</th></tr></thead>
-                <tbody>
-{{#each i in invoices}}
-                  <tr>
-                    <td class="whitespace-nowrap">{{ Fmt.date(i.invoiced_at) }}</td>
-                    <td>{{ invoiceType(i.type) }} <span class="text-xs text-muted">#{{ i.invoice_number }}</span></td>
-                    <td class="whitespace-nowrap">{{ Fmt.kes(i.total) }}</td>
-                    <td class="whitespace-nowrap">{{#if i.balance > 0}}<span class="text-coral font-medium">{{ Fmt.kes(i.balance) }}</span>{{#else}}<span class="bb-chip bb-chip-ok">Paid</span>{{/if}}</td>
-                  </tr>
-{{/each}}
-                </tbody>
-              </table>
-            </div>
-{{/if}}
-          </section>
-
-          <section class="tx-panel">
-            <h2 class="font-semibold p-4 border-b border-line">Payments & receipts</h2>
-{{#if receipts.length is 0}}
-            <p class="p-4 text-sm text-muted">No payments recorded yet.</p>
-{{#else}}
-            <ul class="divide-y divide-line">
-{{#each r in receipts}}
-              <li class="p-4 flex items-center justify-between gap-3">
-                <div class="min-w-0">
-                  <p class="text-sm font-medium">{{ Fmt.kes(r.amount) }} <span class="text-muted font-normal">· receipt {{ r.receipt_number }}</span></p>
-                  <p class="text-xs text-muted">{{ Fmt.date(r.paid_at) }}{{ r.reference ? " · " + r.reference : "" }}</p>
-                </div>
-                <a href="{{ r.receipt_url }}" target="_blank" rel="noopener" class="tx-btn tx-btn-ghost tx-btn-sm"><IconReceipt class="w-4 h-4" /> Receipt <IconExternalLink class="w-3.5 h-3.5" /></a>
-              </li>
-{{/each}}
-            </ul>
-{{/if}}
-          </section>
+          <p class="text-xs text-muted mt-8">Wrong phone number on file? <a href="/contact" class="tx-link">Contact the office</a> to update it.</p>
         </div>
+      </div>
+    </div>
+  </div>
+{{#else}}
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-5 sm:py-8">
+    <div class="flex flex-wrap items-end justify-between gap-3 mb-6">
+      <div class="min-w-0">
+        <p class="tx-eyebrow mb-1">Tenant portal</p>
+        <h1 class="text-2xl font-bold tracking-tight">{{ summary.tenant.name }}</h1>
+        <p class="text-sm text-muted">Account {{ summary.tenant.account_number }}{{ summary.property ? " · " + summary.property.name : "" }}{{ summary.unit ? " · " + summary.unit.name : "" }}</p>
+      </div>
+      <button class="tx-btn tx-btn-outline tx-btn-sm" onclick="{{ signOut() }}"><IconLogout class="w-4 h-4" /> Sign out</button>
+    </div>
 
-        <aside class="flex flex-col gap-4 xl:sticky xl:top-20">
-          <section class="tx-panel p-5">
-            <h2 class="font-semibold mb-1 flex items-center gap-2"><IconMobileMoney class="w-5 h-5 text-brand" /> Pay with M-Pesa</h2>
-            <p class="text-sm text-muted mb-4">We'll send a payment prompt to your phone. Payments go to your oldest invoices first.</p>
-{{#if payState is "completed"}}
-            <div class="tx-alert tx-alert-success mb-4" role="status"><p class="text-sm flex items-start gap-2"><IconCheckCircle class="w-4 h-4 mt-0.5 shrink-0" /> {{ payMessage }}</p></div>
-{{#else if payState is "pending"}}
-            <div class="tx-alert tx-alert-info mb-4" role="status"><p class="text-sm">{{ payMessage }} Waiting for confirmation…</p></div>
-{{#else if payMessage}}
-            <div class="tx-alert tx-alert-error mb-4" role="alert"><p class="text-sm flex items-start gap-2"><IconExclamationTriangle class="w-4 h-4 mt-0.5 shrink-0" /> {{ payMessage }}</p></div>
+    <div class="grid xl:grid-cols-[1fr_360px] gap-6 items-start">
+      <div class="flex flex-col gap-6 min-w-0">
+        <section class="tx-panel p-5">
+{{#if summary.unit}}
+          <p class="text-sm text-muted mb-4">{{ summary.unit.type }} · rent {{ Fmt.price(summary.unit.rent, "rent") }}{{ summary.lease ? " · lease " + Fmt.date(summary.lease.start_date) + " – " + Fmt.date(summary.lease.end_date) : "" }}</p>
 {{/if}}
-            <form onsubmit.prevent="{{ pay() }}" novalidate>
-              <label class="tx-label" for="pay-phone">M-Pesa number</label>
-              <input id="pay-phone" class="tx-input" type="tel" placeholder="0712 345 678" bind:value="{{ payPhone }}" aria-invalid="{{ fieldError(payErrors, 'phone') ? 'true' : 'false' }}" />
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div class="tx-well p-3"><p class="text-xs text-muted">Total due</p><p class="{{ 'text-xl font-semibold ' + (owing > 0 ? 'text-coral' : 'text-mint') }}">{{ Fmt.kes(owing) }}</p></div>
+            <div class="tx-well p-3"><p class="text-xs text-muted">Rent</p><p class="font-semibold">{{ Fmt.kes(balances.rent) }}</p></div>
+            <div class="tx-well p-3"><p class="text-xs text-muted">Utilities</p><p class="font-semibold">{{ Fmt.kes(balances.utilities) }}</p></div>
+            <div class="tx-well p-3"><p class="text-xs text-muted">Account credit</p><p class="font-semibold">{{ Fmt.kes(summary.wallet_balance) }}</p></div>
+          </div>
+{{#if balances.deposit > 0 or balances.lock_fee > 0 or balances.agent_fee > 0}}
+          <p class="text-xs text-muted mt-3">Also due: {{ balances.deposit > 0 ? "deposit " + Fmt.kes(balances.deposit) + " " : "" }}{{ balances.lock_fee > 0 ? "· late fees " + Fmt.kes(balances.lock_fee) + " " : "" }}{{ balances.agent_fee > 0 ? "· agent fee " + Fmt.kes(balances.agent_fee) : "" }}</p>
+{{/if}}
+        </section>
+
+        <section class="tx-panel">
+          <h2 class="font-semibold p-4 border-b border-line">Invoices</h2>
+{{#if invoices.length is 0}}
+          <p class="p-4 text-sm text-muted">No invoices yet.</p>
+{{#else}}
+          <div class="overflow-x-auto">
+            <table class="bb-table">
+              <thead><tr><th>Date</th><th>For</th><th>Amount</th><th>Balance</th><th><span class="sr-only">PDF</span></th></tr></thead>
+              <tbody>
+{{#each i in invoices}}
+                <tr>
+                  <td class="whitespace-nowrap">{{ Fmt.date(i.invoiced_at) }}</td>
+                  <td>{{ invoiceType(i.type) }} <span class="text-xs text-muted">#{{ i.invoice_number }}</span></td>
+                  <td class="whitespace-nowrap">{{ Fmt.kes(i.total) }}</td>
+                  <td class="whitespace-nowrap">{{#if i.balance > 0}}<span class="text-coral font-medium">{{ Fmt.kes(i.balance) }}</span>{{#else}}<span class="bb-chip bb-chip-ok">Paid</span>{{/if}}</td>
+                  <td class="whitespace-nowrap text-right">
+                    <a href="{{ invoicePdf(i, false) }}" target="_blank" rel="noopener" class="tx-btn tx-btn-ghost tx-btn-sm" aria-label="{{ 'View invoice ' + i.invoice_number + ' as PDF' }}"><IconDocumentText class="w-4 h-4" /> PDF</a>
+                    <a href="{{ invoicePdf(i, true) }}" class="tx-icon-btn" aria-label="{{ 'Download invoice ' + i.invoice_number }}" title="Download"><IconDownload class="w-4 h-4" /></a>
+                  </td>
+                </tr>
+{{/each}}
+              </tbody>
+            </table>
+          </div>
+{{/if}}
+        </section>
+
+        <section class="tx-panel p-5" aria-labelledby="statement-heading">
+          <h2 id="statement-heading" class="font-semibold mb-1 flex items-center gap-2"><IconDocumentText class="w-5 h-5 text-brand" /> Account statement</h2>
+          <p class="text-sm text-muted mb-4">Every charge and payment for a period, with your running balance, as a PDF.</p>
+          <div class="grid sm:grid-cols-3 gap-x-3">
+            <div>
+              <label class="tx-label" for="st-period">Period</label>
+              <select id="st-period" class="tx-input" value="{{ preset }}" onchange="{{ applyPreset(event.target.value) }}">
+                <option value="month">This month</option>
+                <option value="3m">Last 3 months</option>
+                <option value="6m">Last 6 months</option>
+                <option value="12m">Last 12 months</option>
+                <option value="year">This year</option>
+                <option value="last-year">Last year</option>
+                <option value="custom">Custom dates</option>
+              </select>
+            </div>
+            <div>
+              <label class="tx-label" for="st-from">From</label>
+              <input id="st-from" class="tx-input" type="date" max="{{ today() }}" value="{{ statementFrom }}" onchange="{{ setStatementDate('statementFrom', event.target.value) }}" />
+            </div>
+            <div>
+              <label class="tx-label" for="st-to">To</label>
+              <input id="st-to" class="tx-input" type="date" max="{{ today() }}" value="{{ statementTo }}" onchange="{{ setStatementDate('statementTo', event.target.value) }}" />
+            </div>
+          </div>
+{{#if statementError}}
+          <p class="text-xs text-coral -mt-2 mb-3" role="alert">{{ statementError }}</p>
+{{#else}}
+          <div class="flex flex-wrap gap-2">
+            <a href="{{ statementUrl }}" target="_blank" rel="noopener" class="tx-btn tx-btn-primary tx-btn-sm"><IconDocumentText class="w-4 h-4" /> View statement</a>
+            <a href="{{ statementUrl + '&download=1' }}" class="tx-btn tx-btn-outline tx-btn-sm"><IconDownload class="w-4 h-4" /> Download PDF</a>
+          </div>
+{{/if}}
+        </section>
+
+        <section class="tx-panel">
+          <h2 class="font-semibold p-4 border-b border-line">Payments & receipts</h2>
+{{#if receipts.length is 0}}
+          <p class="p-4 text-sm text-muted">No payments recorded yet.</p>
+{{#else}}
+          <ul class="divide-y divide-line">
+{{#each r in receipts}}
+            <li class="p-4 flex items-center justify-between gap-3">
+              <div class="min-w-0">
+                <p class="text-sm font-medium">{{ Fmt.kes(r.amount) }} <span class="text-muted font-normal">· receipt {{ r.receipt_number }}</span></p>
+                <p class="text-xs text-muted">{{ Fmt.date(r.paid_at) }}{{ r.reference ? " · " + r.reference : "" }}</p>
+              </div>
+              <a href="{{ r.receipt_url }}" target="_blank" rel="noopener" class="tx-btn tx-btn-ghost tx-btn-sm"><IconReceipt class="w-4 h-4" /> Receipt <IconExternalLink class="w-3.5 h-3.5" /></a>
+            </li>
+{{/each}}
+          </ul>
+{{/if}}
+        </section>
+      </div>
+
+      <aside class="flex flex-col gap-4 xl:sticky xl:top-20">
+        <section class="tx-panel p-5">
+          <h2 class="font-semibold mb-1 flex items-center gap-2"><IconMobileMoney class="w-5 h-5 text-brand" /> Pay with M-Pesa</h2>
+          <p class="text-sm text-muted mb-4">We'll send a payment prompt to your phone. Payments go to your oldest invoices first.</p>
+{{#if payState is "completed"}}
+          <div class="tx-alert tx-alert-success mb-4" role="status"><p class="text-sm flex items-start gap-2"><IconCheckCircle class="w-4 h-4 mt-0.5 shrink-0" /> {{ payMessage }}</p></div>
+{{#else if payState is "pending"}}
+          <div class="tx-alert tx-alert-info mb-4" role="status"><p class="text-sm">{{ payMessage }} Waiting for confirmation…</p></div>
+{{#else if payMessage}}
+          <div class="tx-alert tx-alert-error mb-4" role="alert"><p class="text-sm flex items-start gap-2"><IconExclamationTriangle class="w-4 h-4 mt-0.5 shrink-0" /> {{ payMessage }}</p></div>
+{{/if}}
+          <form onsubmit.prevent="{{ pay() }}" novalidate>
+            <label class="tx-label" for="pay-phone">M-Pesa number</label>
+            <input id="pay-phone" class="tx-input" type="tel" placeholder="0712 345 678" bind:value="{{ payPhone }}" aria-invalid="{{ fieldError(payErrors, 'phone') ? 'true' : 'false' }}" />
 {{#if fieldError(payErrors, "phone")}}<p class="text-xs text-coral -mt-3 mb-3">{{ fieldError(payErrors, "phone") }}</p>{{/if}}
-              <label class="tx-label" for="pay-amount">Amount (KES)</label>
-              <input id="pay-amount" class="tx-input" type="number" min="1" step="1" inputmode="numeric" bind:value="{{ payAmount }}" aria-invalid="{{ fieldError(payErrors, 'amount') ? 'true' : 'false' }}" />
+            <label class="tx-label" for="pay-amount">Amount (KES)</label>
+            <input id="pay-amount" class="tx-input" type="number" min="1" step="1" inputmode="numeric" bind:value="{{ payAmount }}" aria-invalid="{{ fieldError(payErrors, 'amount') ? 'true' : 'false' }}" />
 {{#if fieldError(payErrors, "amount")}}<p class="text-xs text-coral -mt-3 mb-3">{{ fieldError(payErrors, "amount") }}</p>{{/if}}
-              <button type="submit" class="tx-btn tx-btn-primary tx-btn-block justify-center" disabled="{{ payBusy or payState is 'pending' }}">{{ payBusy ? "Sending…" : (payState is "pending" ? "Check your phone…" : "Pay " + (payAmount ? Fmt.kes(payAmount) : "")) }}</button>
-            </form>
-          </section>
+            <button type="submit" class="tx-btn tx-btn-primary tx-btn-block justify-center" disabled="{{ payBusy or payState is 'pending' }}">{{ payBusy ? "Sending…" : (payState is "pending" ? "Check your phone…" : "Pay " + (payAmount ? Fmt.kes(payAmount) : "")) }}</button>
+          </form>
+        </section>
 
 {{#if summary.pay.paybill}}
-          <section class="tx-panel p-5">
-            <h2 class="font-semibold mb-2">Or pay by Paybill</h2>
-            <dl class="text-sm grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
-              <dt class="text-muted">Business no.</dt><dd class="font-mono font-semibold">{{ summary.pay.paybill }}</dd>
-              <dt class="text-muted">Account no.</dt><dd class="font-mono font-semibold">{{ summary.pay.account_number }}</dd>
-            </dl>
-          </section>
+        <section class="tx-panel p-5">
+          <h2 class="font-semibold mb-2">Or pay by Paybill</h2>
+          <dl class="text-sm grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
+            <dt class="text-muted">Business no.</dt><dd class="font-mono font-semibold">{{ summary.pay.paybill }}</dd>
+            <dt class="text-muted">Account no.</dt><dd class="font-mono font-semibold">{{ summary.pay.account_number }}</dd>
+          </dl>
+        </section>
 {{/if}}
 
 {{#if requests.length > 0}}
-          <section class="tx-panel p-5">
-            <h2 class="font-semibold mb-2">Recent requests from this site</h2>
-            <ul class="space-y-2 text-sm">
+        <section class="tx-panel p-5">
+          <h2 class="font-semibold mb-2">Recent requests from this site</h2>
+          <ul class="space-y-2 text-sm">
 {{#each q in requests}}
-              <li class="flex items-center justify-between gap-2">
-                <span>{{ Fmt.kes(q.amount) }} <span class="text-xs text-muted">· {{ Fmt.ago(q.createdAt) }}</span></span>
-                <span class="{{ q.status is 'completed' ? 'bb-chip bb-chip-ok' : (q.status is 'failed' ? 'bb-chip bb-chip-bad' : 'bb-chip bb-chip-warn') }}">{{ Fmt.label(q.status) }}</span>
-              </li>
+            <li class="flex items-center justify-between gap-2">
+              <span>{{ Fmt.kes(q.amount) }} <span class="text-xs text-muted">· {{ Fmt.ago(q.createdAt) }}</span></span>
+              <span class="{{ q.status is 'completed' ? 'bb-chip bb-chip-ok' : (q.status is 'failed' ? 'bb-chip bb-chip-bad' : 'bb-chip bb-chip-warn') }}">{{ Fmt.label(q.status) }}</span>
+            </li>
 {{/each}}
-            </ul>
-          </section>
+          </ul>
+        </section>
 {{/if}}
-        </aside>
-      </div>
-{{/if}}
+      </aside>
     </div>
   </div>
 {{/if}}

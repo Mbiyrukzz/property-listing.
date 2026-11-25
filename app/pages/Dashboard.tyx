@@ -18,7 +18,6 @@ state
   ready: false
   counts: { saved: 0, enquiries: 0, viewings: 0, applications: 0 }
   recent: []
-  tenant: { linked: false }
   profile: null
   loadError: ""
 
@@ -68,7 +67,6 @@ onMount
     if result.ok {
       this.counts = result.data.counts
       this.recent = result.data.recent
-      this.tenant = result.data.tenant
       this.profile = result.data.profile
     } else {
       this.loadError = "Your account summary couldn't be loaded. Refresh to try again."
@@ -142,15 +140,9 @@ template
 
         <section class="rounded-[18px] bg-night text-white p-5 sm:p-6">
           <span class="bb-icon-tile bb-icon-tile-sm bg-white/10 text-butter mb-4"><IconKey /></span>
-{{#if tenant.linked}}
-          <h2 class="font-semibold mb-1">Your tenancy</h2>
-          <p class="text-sm text-white/70 mb-5">Linked to account {{ tenant.accountNumber }} ({{ tenant.name }}).</p>
-          <a href="/tenant" class="tx-btn tx-btn-sm bg-white !text-[#111827] hover:bg-[#E8F2FC]">Balance & payments <IconArrowRight class="w-4 h-4" /></a>
-{{#else}}
           <h2 class="font-semibold mb-1">Renting through us?</h2>
-          <p class="text-sm text-white/70 mb-5">Link your tenancy to see your rent balance and receipts, and pay by M-Pesa.</p>
-          <a href="/tenant" class="tx-btn tx-btn-sm bg-white !text-[#111827] hover:bg-[#E8F2FC]">Link my tenancy</a>
-{{/if}}
+          <p class="text-sm text-white/70 mb-5">Sign in to the tenant portal with your account number and phone to see your balance, download invoices and statements, and pay by M-Pesa.</p>
+          <a href="/tenant" class="tx-btn tx-btn-sm bg-white !text-[#111827] hover:bg-[#E8F2FC]">Open the tenant portal <IconArrowRight class="w-4 h-4" /></a>
         </section>
       </div>
     </div>

@@ -18,6 +18,7 @@ export async function publicRoutes(router: Router) {
   const enquiries = new EnquiryController()
   const site = new SiteController()
   const webhooks = new WebhookController()
+  const tenant = new TenantController()
 
   // News & insights (the starter's posts)
   router.get('/api/public/posts', (req, res) => posts.publicIndex(req, res))
@@ -39,6 +40,20 @@ export async function publicRoutes(router: Router) {
   router.get('/api/pages/:slug', (req, res) => site.page(req, res))
   router.get('/api/agents', (req, res) => site.agents(req, res))
 
+  // Tenant portal. No website account: a tenant signs in with their account
+  // number and an SMS code, and every other route checks that tenant
+  // session itself (app/services/TenantAuth).
+  router.get('/api/tenant', (req, res) => tenant.status(req, res))
+  router.post('/api/tenant/login', (req, res) => tenant.startLogin(req, res))
+  router.post('/api/tenant/login/confirm', (req, res) => tenant.confirmLogin(req, res))
+  router.post('/api/tenant/logout', (req, res) => tenant.logout(req, res))
+  router.get('/api/tenant/invoices', (req, res) => tenant.invoices(req, res))
+  router.get('/api/tenant/invoices/:id/pdf', (req, res) => tenant.invoicePdf(req, res))
+  router.get('/api/tenant/statement/pdf', (req, res) => tenant.statementPdf(req, res))
+  router.get('/api/tenant/payments', (req, res) => tenant.payments(req, res))
+  router.post('/api/tenant/pay', (req, res) => tenant.pay(req, res))
+  router.get('/api/tenant/pay/:id', (req, res) => tenant.paymentStatus(req, res))
+
   // Properman → Barani Better Homes (signed; see app/controllers/WebhookController)
   router.post('/api/integrations/hq/webhook', (req, res) => webhooks.properman(req, res))
 }
@@ -54,7 +69,6 @@ export async function protectedRoutes(router: Router) {
   const posts = new PostController()
   const account = new AccountController()
   const enquiries = new EnquiryController()
-  const tenant = new TenantController()
 
   router.post('/api/uploads', (req, res) => uploads.store(req, res))
 
@@ -80,13 +94,4 @@ export async function protectedRoutes(router: Router) {
   router.post('/api/account/applications', (req, res) => account.apply(req, res))
   router.put('/api/account/applications/:id/withdraw', (req, res) => account.withdraw(req, res))
 
-  // Tenant portal (Properman tenancy)
-  router.get('/api/tenant', (req, res) => tenant.status(req, res))
-  router.post('/api/tenant/link', (req, res) => tenant.startLink(req, res))
-  router.post('/api/tenant/link/confirm', (req, res) => tenant.confirmLink(req, res))
-  router.delete('/api/tenant/link', (req, res) => tenant.unlink(req, res))
-  router.get('/api/tenant/invoices', (req, res) => tenant.invoices(req, res))
-  router.get('/api/tenant/payments', (req, res) => tenant.payments(req, res))
-  router.post('/api/tenant/pay', (req, res) => tenant.pay(req, res))
-  router.get('/api/tenant/pay/:id', (req, res) => tenant.paymentStatus(req, res))
 }

@@ -53,8 +53,31 @@ Order of rollout (HQ is live, so it goes first and stays inert):
 
 Tenant payments still go through HQ's existing M-Pesa setup: Barani Better Homes
 asks HQ to start the STK push, and Safaricom's callbacks keep going to
-hq as they do today. Tenant verification codes are sent by HQ's SMS
-provider.
+hq as they do today. Tenant sign-in codes are sent by the Ashmif gateway
+when `ASHMIF_*` is set, otherwise by HQ's SMS provider.
+
+## Tenant portal
+
+Tenants don't create a website account. On `/tenant` they enter their
+account number and the phone HQ has on file, get a 6-digit code by SMS,
+and are signed in. That session is a random token in an HttpOnly cookie
+that only `/api/tenant/*` receives (only its hash is stored in
+`tenant_sessions`); it lasts up to 30 days and ends after a week without
+a visit, or on "Sign out". It is separate from website accounts and gives
+no access to anything else.
+
+Signed in, a tenant sees their balances, invoices and receipts, pays by
+M-Pesa, and downloads PDFs drawn with `@tylix/pdf` (`app/pdfs/`):
+
+- **Invoices:** each invoice with its items, the payments applied to it
+  and how to pay the rest.
+- **Statements:** every charge, payment and waiver for a period they pick
+  (up to 5 years), with the opening balance, running balance and credit
+  held.
+
+The PDFs read HQ's `/tenants/{id}/invoices/{invoice}` and
+`/tenants/{id}/statement` endpoints, so **deploy HQ before this app**
+when upgrading.
 
 How listings flow:
 
@@ -69,8 +92,8 @@ How listings flow:
    can also run one from `/admin/integration`, which shows the sync log.
 
 Only names, locations, descriptions, photos, unit types and rents leave
-HQ for listings. Tenant data is read only for a signed-in tenant who
-has linked their tenancy by SMS code (see `/tenant`).
+HQ for listings. Tenant data is read only for a tenant signed in to
+`/tenant` with their account number and an SMS code.
 
 ## Processes
 

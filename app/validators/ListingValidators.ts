@@ -119,7 +119,7 @@ export function validateAgent(data: Record<string, unknown>) {
     });
 }
 
-export function validateTenantLink(data: Record<string, unknown>) {
+export function validateTenantLogin(data: Record<string, unknown>) {
     return validate({ ...data, phone: compactPhone(data.phone) }, {
         account_number: [withMessage(required, "Enter your tenant account number (it is on your rent invoices and receipts)."), isString, maxLength(60)],
         phone: [withMessage(required, "Enter the phone number your landlord has on file."), phone],

@@ -605,56 +605,70 @@ export interface ApiRoutes {
     query: Record<string, string | number | boolean | undefined>
     body: undefined
     response: unknown
-    auth: true
+    auth: false
   }
   "GET /api/tenant/invoices": {
     params: Record<string, never>
     query: Record<string, string | number | boolean | undefined>
     body: undefined
     response: unknown
-    auth: true
+    auth: false
   }
-  "DELETE /api/tenant/link": {
-    params: Record<string, never>
+  "GET /api/tenant/invoices/:id/pdf": {
+    params: { id: string | number }
     query: Record<string, string | number | boolean | undefined>
     body: undefined
     response: unknown
-    auth: true
+    auth: false
   }
-  "POST /api/tenant/link": {
+  "POST /api/tenant/login": {
     params: Record<string, never>
     query: Record<string, string | number | boolean | undefined>
     body: Record<string, unknown>
     response: unknown
-    auth: true
+    auth: false
   }
-  "POST /api/tenant/link/confirm": {
+  "POST /api/tenant/login/confirm": {
     params: Record<string, never>
     query: Record<string, string | number | boolean | undefined>
     body: Record<string, unknown>
     response: unknown
-    auth: true
+    auth: false
+  }
+  "POST /api/tenant/logout": {
+    params: Record<string, never>
+    query: Record<string, string | number | boolean | undefined>
+    body: Record<string, unknown>
+    response: unknown
+    auth: false
   }
   "POST /api/tenant/pay": {
     params: Record<string, never>
     query: Record<string, string | number | boolean | undefined>
     body: Record<string, unknown>
     response: unknown
-    auth: true
+    auth: false
   }
   "GET /api/tenant/pay/:id": {
     params: { id: string | number }
     query: Record<string, string | number | boolean | undefined>
     body: undefined
     response: unknown
-    auth: true
+    auth: false
   }
   "GET /api/tenant/payments": {
     params: Record<string, never>
     query: Record<string, string | number | boolean | undefined>
     body: undefined
     response: unknown
-    auth: true
+    auth: false
+  }
+  "GET /api/tenant/statement/pdf": {
+    params: Record<string, never>
+    query: Record<string, string | number | boolean | undefined>
+    body: undefined
+    response: unknown
+    auth: false
   }
   "POST /api/uploads": {
     params: Record<string, never>
@@ -807,17 +821,23 @@ export interface RouteClient {
   site(options?: RouteOptions<ApiRoutes["GET /api/site"]['query']>): Promise<ApiResult<ApiRoutes["GET /api/site"]['response']>>
   tenant: {
     index(options?: RouteOptions<ApiRoutes["GET /api/tenant"]['query']>): Promise<ApiResult<ApiRoutes["GET /api/tenant"]['response']>>
-    invoices(options?: RouteOptions<ApiRoutes["GET /api/tenant/invoices"]['query']>): Promise<ApiResult<ApiRoutes["GET /api/tenant/invoices"]['response']>>
-    link: {
-      destroy(options?: RouteOptions<ApiRoutes["DELETE /api/tenant/link"]['query']>): Promise<ApiResult<ApiRoutes["DELETE /api/tenant/link"]['response']>>
-      store(body?: ApiRoutes["POST /api/tenant/link"]['body'], options?: RouteOptions<ApiRoutes["POST /api/tenant/link"]['query']>): Promise<ApiResult<ApiRoutes["POST /api/tenant/link"]['response']>>
-      confirm(body?: ApiRoutes["POST /api/tenant/link/confirm"]['body'], options?: RouteOptions<ApiRoutes["POST /api/tenant/link/confirm"]['query']>): Promise<ApiResult<ApiRoutes["POST /api/tenant/link/confirm"]['response']>>
+    invoices: {
+      index(options?: RouteOptions<ApiRoutes["GET /api/tenant/invoices"]['query']>): Promise<ApiResult<ApiRoutes["GET /api/tenant/invoices"]['response']>>
+      pdf(params: ApiRoutes["GET /api/tenant/invoices/:id/pdf"]['params'], options?: RouteOptions<ApiRoutes["GET /api/tenant/invoices/:id/pdf"]['query']>): Promise<ApiResult<ApiRoutes["GET /api/tenant/invoices/:id/pdf"]['response']>>
     }
+    login: {
+      store(body?: ApiRoutes["POST /api/tenant/login"]['body'], options?: RouteOptions<ApiRoutes["POST /api/tenant/login"]['query']>): Promise<ApiResult<ApiRoutes["POST /api/tenant/login"]['response']>>
+      confirm(body?: ApiRoutes["POST /api/tenant/login/confirm"]['body'], options?: RouteOptions<ApiRoutes["POST /api/tenant/login/confirm"]['query']>): Promise<ApiResult<ApiRoutes["POST /api/tenant/login/confirm"]['response']>>
+    }
+    logout(body?: ApiRoutes["POST /api/tenant/logout"]['body'], options?: RouteOptions<ApiRoutes["POST /api/tenant/logout"]['query']>): Promise<ApiResult<ApiRoutes["POST /api/tenant/logout"]['response']>>
     pay: {
       store(body?: ApiRoutes["POST /api/tenant/pay"]['body'], options?: RouteOptions<ApiRoutes["POST /api/tenant/pay"]['query']>): Promise<ApiResult<ApiRoutes["POST /api/tenant/pay"]['response']>>
       show(params: ApiRoutes["GET /api/tenant/pay/:id"]['params'], options?: RouteOptions<ApiRoutes["GET /api/tenant/pay/:id"]['query']>): Promise<ApiResult<ApiRoutes["GET /api/tenant/pay/:id"]['response']>>
     }
     payments(options?: RouteOptions<ApiRoutes["GET /api/tenant/payments"]['query']>): Promise<ApiResult<ApiRoutes["GET /api/tenant/payments"]['response']>>
+    statement: {
+      pdf(options?: RouteOptions<ApiRoutes["GET /api/tenant/statement/pdf"]['query']>): Promise<ApiResult<ApiRoutes["GET /api/tenant/statement/pdf"]['response']>>
+    }
   }
   uploads(body?: ApiRoutes["POST /api/uploads"]['body'], options?: RouteOptions<ApiRoutes["POST /api/uploads"]['query']>): Promise<ApiResult<ApiRoutes["POST /api/uploads"]['response']>>
   viewings(body?: ApiRoutes["POST /api/viewings"]['body'], options?: RouteOptions<ApiRoutes["POST /api/viewings"]['query']>): Promise<ApiResult<ApiRoutes["POST /api/viewings"]['response']>>

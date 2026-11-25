@@ -137,6 +137,11 @@ export const Properman = {
     tenantSummary: (tenantId: number) => call("GET", `/tenants/${tenantId}/summary`),
     tenantInvoices: (tenantId: number) => call("GET", `/tenants/${tenantId}/invoices?limit=24`),
     tenantPayments: (tenantId: number) => call("GET", `/tenants/${tenantId}/payments?limit=50`),
+    // One invoice with its items and payments, for the invoice PDF.
+    tenantInvoice: (tenantId: number, invoiceId: number) => call("GET", `/tenants/${tenantId}/invoices/${invoiceId}`),
+    // A ledger for from..to (YYYY-MM-DD), for the statement PDF.
+    tenantStatement: (tenantId: number, from: string, to: string) =>
+        call("GET", `/tenants/${tenantId}/statement?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
     stkPush: (tenantId: number, phone: string, amount: number) =>
         call("POST", `/tenants/${tenantId}/stk-push`, { phone, amount }),
     paymentStatus: (tenantId: number, paymentId: number) =>

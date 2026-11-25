@@ -11,7 +11,6 @@ import { Agent } from "../models/Agent.js";
 import { User } from "../models/User.js";
 import { CustomerProfile } from "../models/CustomerProfile.js";
 import { SavedProperty } from "../models/SavedProperty.js";
-import { TenantLink } from "../models/TenantLink.js";
 import { APPLICATION_STATUSES, ENQUIRY_STATUSES, VIEWING_STATUSES, toNumber, type ListingRow, type UnitRow } from "../services/catalog.js";
 
 type Row = Record<string, any>;
@@ -183,12 +182,11 @@ export class AdminLeadsController {
         if (q) users = users.filter((u) => `${u.name} ${u.email}`.toLowerCase().includes(q));
         users = users.slice(0, 300);
 
-        const [profiles, saves, enquiries, applications, links] = (await Promise.all([
+        const [profiles, saves, enquiries, applications] = (await Promise.all([
             CustomerProfile.all(),
             SavedProperty.all(),
             Enquiry.query().whereNotNull("user_id").get(),
             Application.all(),
-            TenantLink.all(),
         ])) as Row[][];
 
         return res.json({
@@ -200,7 +198,6 @@ export class AdminLeadsController {
                     saved: saves.filter((s) => Number(s.user_id) === u.id).length,
                     enquiries: enquiries.filter((e) => Number(e.user_id) === u.id).length,
                     applications: applications.filter((a) => Number(a.user_id) === u.id).length,
-                    isTenant: links.some((l) => Number(l.user_id) === u.id),
                 };
             }),
         });

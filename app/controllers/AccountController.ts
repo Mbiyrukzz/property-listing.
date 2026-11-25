@@ -13,7 +13,6 @@ import { Viewing } from "../models/Viewing.js";
 import { Application } from "../models/Application.js";
 import { Listing } from "../models/Listing.js";
 import { ListingUnit } from "../models/ListingUnit.js";
-import { TenantLink } from "../models/TenantLink.js";
 import { normaliseContact, validateApplication, PHONE_RE } from "../validators/ListingValidators.js";
 import { presentCard, toNumber, type ListingRow, type UnitRow } from "../services/catalog.js";
 
@@ -60,12 +59,11 @@ async function profileOf(userId: number) {
 export class AccountController {
     async overview(req: TylixRequest, res: TylixResponse) {
         const userId = uid(req);
-        const [saved, enquiries, viewings, applications, link] = await Promise.all([
+        const [saved, enquiries, viewings, applications] = await Promise.all([
             SavedProperty.where("user_id", userId).get(),
             Enquiry.where("user_id", userId).latest().get(),
             Viewing.where("user_id", userId).latest().get(),
             Application.where("user_id", userId).latest().get(),
-            TenantLink.query().where("user_id", userId).first(),
         ]);
         const all = [...(enquiries as Row[]), ...(viewings as Row[]), ...(applications as Row[])];
         const map = await listingsById(all.map((r) => Number(r.property_id)));
@@ -87,7 +85,6 @@ export class AccountController {
                 applications: (applications as Row[]).filter((a) => a.status === "submitted" || a.status === "reviewing").length,
             },
             recent,
-            tenant: link ? { linked: true, name: (link as Row).tenant_name, accountNumber: (link as Row).account_number } : { linked: false },
         });
     }
 

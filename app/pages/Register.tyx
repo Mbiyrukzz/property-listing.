@@ -23,7 +23,7 @@ state
   perks: [
     "Save properties you like",
     "Book viewings and apply online",
-    "Tenant portal for balances, receipts and rent payments"
+    "Follow your enquiries and applications"
   ]
 
 computed
@@ -309,6 +309,9 @@ template
 
           <p class="text-sm text-muted text-center mt-6">
             Already have an account? <a href="{{ next is '/dashboard' ? '/login' : '/login?next=' + encodeURIComponent(next) }}" class="tx-link">Log in</a>
+          </p>
+          <p class="text-sm text-muted text-center mt-2">
+            Already a tenant? You don't need an account: <a href="/tenant" class="tx-link">use the tenant portal</a>.
           </p>
 {{/if}}
         </div>

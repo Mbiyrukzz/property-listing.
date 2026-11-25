@@ -1,6 +1,6 @@
 component SiteNavbar
 
-import { IconSun, IconMoon, IconMenu, IconX, IconHeart, IconUserCircle, IconLayoutGrid, IconKey, IconHome, IconBuildingOffice, IconTree, IconNewspaper, IconChatBubble, IconLogout, IconTag } from "tylix-icons"
+import { IconSun, IconMoon, IconMenu, IconX, IconHeart, IconUserCircle, IconLayoutGrid, IconKey, IconHome, IconBuildingOffice, IconTree, IconNewspaper, IconChatBubble, IconLogout, IconTag, IconMobileMoney } from "tylix-icons"
 
 uses
   Auth
@@ -54,6 +54,7 @@ template
           <a href="{{ link.href }}" class="{{ linkClass(link.href) }}">{{ link.label }}</a>
 {{/each}}
           <a href="/p/about#landlords" class="hidden xl:inline-flex bb-nav-link">For landlords</a>
+          <a href="/tenant" class="{{ linkClass('/tenant') }}">Tenant portal</a>
         </div>
       </div>
 
@@ -105,6 +106,7 @@ template
 {{/each}}
           <a href="/p/about#landlords" onclick="{{ closeMobileMenu() }}" class="{{ sheetClass('/p/about') }}"><IconBuildingOffice /> For landlords</a>
           <a href="/contact" onclick="{{ closeMobileMenu() }}" class="{{ sheetClass('/contact') }}"><IconChatBubble /> Contact us</a>
+          <a href="/tenant" onclick="{{ closeMobileMenu() }}" class="{{ sheetClass('/tenant') }}"><IconMobileMoney /> Tenant portal</a>
         </div>
 
         <div class="h-px bg-line my-3 mx-2"></div>
@@ -112,7 +114,6 @@ template
 {{#if Auth.user}}
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-0.5">
           <a href="/dashboard" class="{{ sheetClass('/dashboard') }}"><IconUserCircle /> My account</a>
-          <a href="/tenant" class="{{ sheetClass('/tenant') }}"><IconKey /> Tenant portal</a>
 {{#if can("admin.access")}}
           <a href="/admin" class="{{ sheetClass('/admin') }}"><IconLayoutGrid /> Admin</a>
 {{/if}}
