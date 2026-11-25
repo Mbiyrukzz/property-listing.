@@ -23,6 +23,8 @@ let hq: http.Server
 let app: http.Server
 let base = ''
 const hqCalls: string[] = []
+const hqBodies: Record<string, any>[] = []
+let repairs: Record<string, any>[] = []
 
 const party = {
     issuer: { name: 'Barani Better Homes Ltd', address: 'Nairobi', phone: '0700 000 000', email: 'accounts@example.com' },
@@ -84,6 +86,21 @@ function fakeHq(req: http.IncomingMessage, res: http.ServerResponse) {
             } })
         }
         if (rest === '/payments') return send(200, { data: [] })
+        if (rest === '/maintenance' && req.method === 'GET') return send(200, { data: repairs })
+        if (rest === '/maintenance' && req.method === 'POST') {
+            hqBodies.push(body)
+            const row = { id: 900 + repairs.length, ...body, status: 'submitted', source: 'tenant_portal', created_at: '2026-11-25T10:00:00+03:00', can_cancel: true }
+            repairs = [row, ...repairs]
+            return send(201, { data: row })
+        }
+        const cancel = rest.match(/^\/maintenance\/(\d+)\/cancel$/)
+        if (cancel && req.method === 'POST') {
+            const row = repairs.find((r) => r.id === Number(cancel[1]))
+            if (!row) return send(404, { error: 'Request not found.' })
+            row.status = 'cancelled'
+            row.can_cancel = false
+            return send(200, { data: row })
+        }
         return send(404, { error: 'not here' })
     })
 }
@@ -133,6 +150,8 @@ async function resetSignInLimits() {
         `tenant-confirm-account:${ACCOUNT.toLowerCase()}`,
     ]
     for (const key of keys) await getStore().delete(`ratelimit:${key}:${start}`)
+    const hour = 60 * 60_000
+    await getStore().delete(`ratelimit:tenant-maintenance:t:${TENANT_ID}:${Math.floor(Date.now() / hour) * hour}`)
 }
 
 after(async () => {
@@ -238,4 +257,51 @@ test('a tenant signs in with account number and SMS code, without a website acco
 test('a made-up session cookie is refused', async () => {
     const res = await call('/api/tenant/invoices', { cookie: 'bb_tenant=not-a-real-token' })
     assert.equal(res.status, 403)
+})
+
+test('a tenant reports a repair, which goes to HQ for their own tenancy, and can cancel it', async () => {
+    let res = await call('/api/tenant/maintenance')
+    assert.equal(res.status, 403)
+    res = await call('/api/tenant/maintenance', { method: 'POST', body: JSON.stringify({ title: 'Leak' }) })
+    assert.equal(res.status, 403)
+
+    await call('/api/tenant/login', { method: 'POST', body: JSON.stringify({ account_number: ACCOUNT, phone: PHONE }) })
+    res = await call('/api/tenant/login/confirm', { method: 'POST', body: JSON.stringify({ account_number: ACCOUNT, phone: PHONE, code: CODE }) })
+    const cookie = (res.headers.get('set-cookie') ?? '').split(';')[0]
+
+    // Checked here before HQ is asked.
+    const before = hqBodies.length
+    res = await call('/api/tenant/maintenance', { method: 'POST', cookie, body: JSON.stringify({ title: 'x', category: 'magic', priority: 'now' }) })
+    assert.equal(res.status, 422)
+    const errors = (await res.json()).errors
+    assert.ok(errors.title && errors.description && errors.category && errors.priority)
+    assert.equal(hqBodies.length, before)
+
+    // A tenant id in the body is ignored: HQ is asked for the session's tenant.
+    res = await call('/api/tenant/maintenance', {
+        method: 'POST',
+        cookie,
+        body: JSON.stringify({ title: '  Kitchen sink leaking ', description: 'Water under the sink since Monday.', category: 'plumbing', priority: 'high', tenant_id: 1 }),
+    })
+    assert.equal(res.status, 201)
+    const created = (await res.json()).data
+    assert.equal(created.status, 'submitted')
+    assert.ok(hqCalls.includes(`POST /tenants/${TENANT_ID}/maintenance`))
+    const sent = hqBodies[hqBodies.length - 1]
+    assert.equal(sent.title, 'Kitchen sink leaking')
+    assert.equal(sent.tenant_id, undefined)
+    // No contact given: the phone on the session is passed on for the technician.
+    assert.equal(sent.reported_contact, PHONE)
+
+    res = await call('/api/tenant/maintenance', { cookie })
+    assert.equal(res.status, 200)
+    assert.equal((await res.json()).data[0].id, created.id)
+
+    res = await call(`/api/tenant/maintenance/${created.id}/cancel`, { method: 'POST', cookie })
+    assert.equal(res.status, 200)
+    assert.equal((await res.json()).data.status, 'cancelled')
+    res = await call('/api/tenant/maintenance/12345/cancel', { method: 'POST', cookie })
+    assert.equal(res.status, 404)
+
+    await call('/api/tenant/logout', { method: 'POST', cookie })
 })

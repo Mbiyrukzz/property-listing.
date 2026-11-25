@@ -7,6 +7,7 @@ import { SiteController } from '../controllers/SiteController.js'
 import { WebhookController } from '../controllers/WebhookController.js'
 import { AccountController } from '../controllers/AccountController.js'
 import { TenantController } from '../controllers/TenantController.js'
+import { LandlordController } from '../controllers/LandlordController.js'
 import { permissions } from '../permissions.js'
 import { accessRoutes } from './access.js'
 import { adminRoutes } from './admin.js'
@@ -19,6 +20,7 @@ export async function publicRoutes(router: Router) {
   const site = new SiteController()
   const webhooks = new WebhookController()
   const tenant = new TenantController()
+  const landlord = new LandlordController()
 
   // News & insights (the starter's posts)
   router.get('/api/public/posts', (req, res) => posts.publicIndex(req, res))
@@ -53,6 +55,22 @@ export async function publicRoutes(router: Router) {
   router.get('/api/tenant/payments', (req, res) => tenant.payments(req, res))
   router.post('/api/tenant/pay', (req, res) => tenant.pay(req, res))
   router.get('/api/tenant/pay/:id', (req, res) => tenant.paymentStatus(req, res))
+  router.get('/api/tenant/maintenance', (req, res) => tenant.maintenance(req, res))
+  router.post('/api/tenant/maintenance', (req, res) => tenant.reportMaintenance(req, res))
+  router.post('/api/tenant/maintenance/:id/cancel', (req, res) => tenant.cancelMaintenance(req, res))
+
+  // Landlord portal: the same sign-in as tenants (account number + SMS
+  // code, no website account), with its own session cookie that only
+  // /api/landlord/* receives (app/services/LandlordAuth). Read-only.
+  router.get('/api/landlord', (req, res) => landlord.status(req, res))
+  router.post('/api/landlord/login', (req, res) => landlord.startLogin(req, res))
+  router.post('/api/landlord/login/confirm', (req, res) => landlord.confirmLogin(req, res))
+  router.post('/api/landlord/logout', (req, res) => landlord.logout(req, res))
+  router.get('/api/landlord/units', (req, res) => landlord.units(req, res))
+  router.get('/api/landlord/payouts', (req, res) => landlord.payouts(req, res))
+  router.get('/api/landlord/payouts/:id/pdf', (req, res) => landlord.payoutPdf(req, res))
+  router.get('/api/landlord/statement/pdf', (req, res) => landlord.statementPdf(req, res))
+  router.get('/api/landlord/maintenance', (req, res) => landlord.maintenance(req, res))
 
   // Properman → Barani Better Homes (signed; see app/controllers/WebhookController)
   router.post('/api/integrations/hq/webhook', (req, res) => webhooks.properman(req, res))

@@ -146,6 +146,28 @@ export const Properman = {
         call("POST", `/tenants/${tenantId}/stk-push`, { phone, amount }),
     paymentStatus: (tenantId: number, paymentId: number) =>
         call("GET", `/tenants/${tenantId}/payments/${paymentId}/status`),
+
+    // Maintenance requests from the tenant portal land in HQ's own queue.
+    tenantMaintenance: (tenantId: number) => call("GET", `/tenants/${tenantId}/maintenance`),
+    createTenantMaintenance: (tenantId: number, body: Record<string, unknown>) =>
+        call("POST", `/tenants/${tenantId}/maintenance`, body),
+    cancelTenantMaintenance: (tenantId: number, requestId: number) =>
+        call("POST", `/tenants/${tenantId}/maintenance/${requestId}/cancel`),
+
+    // Landlord portal: the same SMS sign-in, then read-only views.
+    startLandlordVerification: (accountNumber: string, phone: string, deliverBy: "properman" | "caller" = "properman") =>
+        call("POST", "/landlords/verification", { account_number: accountNumber, phone, deliver_by: deliverBy }),
+    confirmLandlordVerification: (accountNumber: string, phone: string, code: string) =>
+        call("POST", "/landlords/verification/confirm", { account_number: accountNumber, phone, code }),
+    landlordSummary: (landlordId: number) => call("GET", `/landlords/${landlordId}/summary`),
+    landlordUnits: (landlordId: number) => call("GET", `/landlords/${landlordId}/units`),
+    landlordPayouts: (landlordId: number) => call("GET", `/landlords/${landlordId}/payouts?limit=36`),
+    // One payout with its breakdown, for the payout PDF.
+    landlordPayout: (landlordId: number, payoutId: number) => call("GET", `/landlords/${landlordId}/payouts/${payoutId}`),
+    // Payouts made from..to (YYYY-MM-DD), for the income statement PDF.
+    landlordStatement: (landlordId: number, from: string, to: string) =>
+        call("GET", `/landlords/${landlordId}/statement?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
+    landlordMaintenance: (landlordId: number) => call("GET", `/landlords/${landlordId}/maintenance?limit=50`),
 };
 
 // Webhook signature: hex HMAC-SHA256 of "<timestamp>.<raw body>" (see

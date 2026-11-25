@@ -79,6 +79,47 @@ The PDFs read HQ's `/tenants/{id}/invoices/{invoice}` and
 `/tenants/{id}/statement` endpoints, so **deploy HQ before this app**
 when upgrading.
 
+- **Repairs:** "Report a problem" sends a maintenance request (category,
+  urgency, details, a phone for the technician) straight into HQ's
+  maintenance queue as `source = tenant_portal`, where it shows on the
+  maintenance page, its nav badge and (for high/urgent) the attention
+  list. The tenant follows its status in the portal and can withdraw it
+  until the office picks it up. Up to 5 requests an hour per tenant.
+
+## Landlord portal
+
+Landlords sign in on `/landlord` exactly like tenants: their landlord
+account number (on their payout statements) and the phone HQ has on file,
+then a 6-digit SMS code. The session is its own cookie, `bb_landlord`,
+sent only to `/api/landlord/*` and stored hashed in `landlord_sessions`
+with the same 30-day / 7-days-idle limits. A tenant cookie never opens
+the landlord API, or the other way round.
+
+Everything is read-only and read from HQ on each visit:
+
+- **Overview:** money collected since each property's last payout (and
+  the estimated fee), paid out this year and all time, occupancy, rent
+  owed by tenants, rent lost to vacancies, and a 12-month payout chart.
+  Where payouts go is shown masked; it can only be changed by the office.
+- **Units:** every unit with its tenant and arrears, or how long it has
+  been vacant and whether it's advertised on the site (with a link).
+- **Payouts & statements:** each payout with a PDF showing collections,
+  management fee, expenses, credit notes, loan repayment and what was
+  paid, per unit; and an income statement PDF for any period up to 5
+  years.
+- **Repairs:** maintenance on their properties, with status, the fundi
+  and the cost.
+
+Payouts are matched to landlords by `disbursements.landlord_id`, which HQ
+now records when a payout is made (existing ones were filled from each
+property's current landlord), so a landlord who takes over a property
+doesn't see the previous owner's payouts.
+
+When upgrading, deploy HQ and run its migrations first (it adds
+`disbursements.landlord_id` and the `/landlords/*` and
+`/tenants/{id}/maintenance` endpoints), then deploy this app and run
+`npx tylix migrate` (it adds `landlord_sessions`).
+
 How listings flow:
 
 1. In HQ, open a property and use the **Barani Better Homes website** panel: tick
@@ -93,7 +134,8 @@ How listings flow:
 
 Only names, locations, descriptions, photos, unit types and rents leave
 HQ for listings. Tenant data is read only for a tenant signed in to
-`/tenant` with their account number and an SMS code.
+`/tenant`, and landlord data only for a landlord signed in to `/landlord`,
+each with their account number and an SMS code.
 
 ## Processes
 

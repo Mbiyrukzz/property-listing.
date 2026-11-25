@@ -1,6 +1,6 @@
 page TenantPortal
 
-import { IconKey, IconMobileMoney, IconReceipt, IconCheckCircle, IconCheck, IconExclamationTriangle, IconExternalLink, IconRefresh, IconLogout, IconDocumentText, IconDownload } from "tylix-icons"
+import { IconKey, IconMobileMoney, IconReceipt, IconCheckCircle, IconCheck, IconExclamationTriangle, IconExternalLink, IconRefresh, IconLogout, IconDocumentText, IconDownload, IconTool, IconPlus, IconX } from "tylix-icons"
 
 title "Tenant portal | Barani Better Homes"
 
@@ -37,11 +37,39 @@ state
   preset: "6m"
   statementFrom: ""
   statementTo: ""
+  repairs: []
+  repairsLoaded: false
+  repairFormOpen: false
+  repairTitle: ""
+  repairDescription: ""
+  repairCategory: "plumbing"
+  repairPriority: "medium"
+  repairContact: ""
+  repairErrors: {}
+  repairMessage: ""
+  repairMessageKind: "info"
+  repairBusy: false
+  cancellingId: null
+  repairCategories: [
+    { value: "plumbing", label: "Plumbing & water" },
+    { value: "electrical", label: "Electrical & lighting" },
+    { value: "appliance", label: "Appliance (cooker, heater, fridge)" },
+    { value: "structural", label: "Doors, windows, walls & roof" },
+    { value: "pest", label: "Pests" },
+    { value: "other", label: "Something else" }
+  ]
+  repairPriorities: [
+    { value: "low", label: "Low", hint: "Can wait until a convenient time" },
+    { value: "medium", label: "Normal", hint: "Needs fixing in the next few days" },
+    { value: "high", label: "High", hint: "Affects daily living" },
+    { value: "urgent", label: "Emergency", hint: "Flooding, no power, gas, danger or no water" }
+  ]
   perks: [
     "No website account needed, just your account number and phone",
     "Check your balance and every invoice",
     "Download invoices and account statements as PDF",
-    "Pay rent by M-Pesa from your phone"
+    "Pay rent by M-Pesa from your phone",
+    "Report repairs and follow them until they're fixed"
   ]
 
 computed
@@ -64,6 +92,10 @@ computed
       return "The start date can't be in the future."
     }
     return ""
+  }
+
+  openRepairs() {
+    return this.repairs.filter((r) => ["submitted", "acknowledged", "in_progress", "on_hold"].includes(r.status)).length
   }
 
   statementUrl() {
@@ -144,6 +176,10 @@ action
     this.payId = null
     this.step = "details"
     this.code = ""
+    this.repairs = []
+    this.repairsLoaded = false
+    this.repairFormOpen = false
+    this.repairMessage = ""
   }
 
   async load() {
@@ -168,9 +204,13 @@ action
   }
 
   async loadAccount() {
-    const [inv, pay] = await Promise.all([useApi("/api/tenant/invoices"), useApi("/api/tenant/payments")])
-    if this.sessionEnded(inv) or this.sessionEnded(pay) {
+    const [inv, pay, rep] = await Promise.all([useApi("/api/tenant/invoices"), useApi("/api/tenant/payments"), useApi("/api/tenant/maintenance")])
+    if this.sessionEnded(inv) or this.sessionEnded(pay) or this.sessionEnded(rep) {
       return null
+    }
+    if rep.ok {
+      this.repairs = rep.data.data
+      this.repairsLoaded = true
     }
     if inv.ok {
       this.invoices = inv.data.data
@@ -302,6 +342,109 @@ action
     }
   }
 
+  openRepairForm() {
+    this.repairFormOpen = true
+    this.repairErrors = {}
+    this.repairMessage = ""
+    this.repairContact = this.repairContact or (this.summary ? this.summary.tenant.phone : "") or ""
+  }
+
+  async reportRepair() {
+    if this.repairBusy {
+      return null
+    }
+    this.repairBusy = true
+    this.repairErrors = {}
+    this.repairMessage = ""
+    const result = await useApi("/api/tenant/maintenance", {
+      method: "POST",
+      body: { title: this.repairTitle, description: this.repairDescription, category: this.repairCategory, priority: this.repairPriority, reported_contact: this.repairContact }
+    })
+    this.repairBusy = false
+    if this.sessionEnded(result) {
+      return null
+    }
+    if result.ok {
+      const created = result.data.data
+      this.repairs = [created, ...this.repairs.filter((r) => r.id is not created.id)]
+      this.repairFormOpen = false
+      this.repairTitle = ""
+      this.repairDescription = ""
+      this.repairPriority = "medium"
+      this.repairMessageKind = "success"
+      this.repairMessage = result.data.duplicate
+        ? "You already reported this a few minutes ago, so we kept the first request (#" + created.id + ")."
+        : "Request #" + created.id + " is with the office. You'll see updates here."
+      if created.priority is "urgent" {
+        this.repairMessage = this.repairMessage + " For an emergency, please also call the office now."
+      }
+    } else if result.status is 422 and result.data?.errors {
+      this.repairErrors = result.data.errors
+    } else {
+      this.repairMessageKind = "error"
+      this.repairMessage = Fmt.firstError(result, "The request couldn't be sent. Try again, or call the office.")
+    }
+  }
+
+  async cancelRepair(r) {
+    if this.cancellingId {
+      return null
+    }
+    if not confirm("Cancel request #" + r.id + " (" + r.title + ")?") {
+      return null
+    }
+    this.cancellingId = r.id
+    const result = await useApi(`/api/tenant/maintenance/${r.id}/cancel`, { method: "POST" })
+    this.cancellingId = null
+    if this.sessionEnded(result) {
+      return null
+    }
+    if result.ok {
+      this.repairs = this.repairs.map((x) => x.id is r.id ? result.data.data : x)
+      this.repairMessageKind = "info"
+      this.repairMessage = "Request #" + r.id + " was cancelled."
+    } else {
+      this.repairMessageKind = "error"
+      this.repairMessage = Fmt.firstError(result, "That request couldn't be cancelled.")
+    }
+  }
+
+  repairStatus(status) {
+    if status is "submitted" {
+      return "Sent"
+    }
+    if status is "acknowledged" {
+      return "Seen by office"
+    }
+    if status is "resolved" {
+      return "Fixed"
+    }
+    return Fmt.label(status)
+  }
+
+  repairChip(status) {
+    if status is "resolved" or status is "closed" {
+      return "bb-chip bb-chip-ok"
+    }
+    if status is "cancelled" {
+      return "bb-chip"
+    }
+    if status is "on_hold" {
+      return "bb-chip bb-chip-bad"
+    }
+    return "bb-chip bb-chip-warn"
+  }
+
+  categoryLabel(value) {
+    const found = this.repairCategories.find((c) => c.value is value)
+    return found ? found.label : Fmt.label(value)
+  }
+
+  priorityHint(value) {
+    const found = this.repairPriorities.find((p) => p.value is value)
+    return found ? found.hint : ""
+  }
+
   // Properman invoice_type values (constants on its Transaction model).
   invoiceType(type) {
     if type is "income" {
@@ -400,7 +543,7 @@ template
             </div>
           </form>
 {{/if}}
-          <p class="text-xs text-muted mt-8">Wrong phone number on file? <a href="/contact" class="tx-link">Contact the office</a> to update it.</p>
+          <p class="text-xs text-muted mt-8">Wrong phone number on file? <a href="/contact" class="tx-link">Contact the office</a> to update it. A landlord? <a href="/landlord" class="tx-link">Go to the landlord portal</a>.</p>
         </div>
       </div>
     </div>
@@ -430,6 +573,80 @@ template
           </div>
 {{#if balances.deposit > 0 or balances.lock_fee > 0 or balances.agent_fee > 0}}
           <p class="text-xs text-muted mt-3">Also due: {{ balances.deposit > 0 ? "deposit " + Fmt.kes(balances.deposit) + " " : "" }}{{ balances.lock_fee > 0 ? "· late fees " + Fmt.kes(balances.lock_fee) + " " : "" }}{{ balances.agent_fee > 0 ? "· agent fee " + Fmt.kes(balances.agent_fee) : "" }}</p>
+{{/if}}
+        </section>
+
+        <section class="tx-panel" aria-labelledby="repairs-heading">
+          <div class="flex flex-wrap items-center justify-between gap-3 p-4 border-b border-line">
+            <div>
+              <h2 id="repairs-heading" class="font-semibold flex items-center gap-2"><IconTool class="w-5 h-5 text-brand" /> Repairs & maintenance</h2>
+              <p class="text-xs text-muted">{{ openRepairs > 0 ? openRepairs + " open request" + (openRepairs is 1 ? "" : "s") : "Something broken? Tell the office here." }}</p>
+            </div>
+{{#if not repairFormOpen}}
+            <button class="tx-btn tx-btn-primary tx-btn-sm" onclick="{{ openRepairForm() }}"><IconPlus class="w-4 h-4" /> Report a problem</button>
+{{/if}}
+          </div>
+{{#if repairMessage}}
+          <div class="{{ 'tx-alert m-4 ' + (repairMessageKind is 'error' ? 'tx-alert-error' : (repairMessageKind is 'success' ? 'tx-alert-success' : 'tx-alert-info')) }}" role="status" aria-live="polite"><p class="text-sm">{{ repairMessage }}</p></div>
+{{/if}}
+{{#if repairFormOpen}}
+          <form class="p-4 border-b border-line" onsubmit.prevent="{{ reportRepair() }}" novalidate>
+            <div class="grid sm:grid-cols-2 gap-x-3">
+              <div>
+                <label class="tx-label" for="rp-category">What kind of problem?</label>
+                <select id="rp-category" class="tx-input" bind:value="{{ repairCategory }}">
+{{#each c in repairCategories}}
+                  <option value="{{ c.value }}">{{ c.label }}</option>
+{{/each}}
+                </select>
+              </div>
+              <div>
+                <label class="tx-label" for="rp-priority">How urgent?</label>
+                <select id="rp-priority" class="tx-input" bind:value="{{ repairPriority }}" aria-describedby="rp-priority-hint">
+{{#each p in repairPriorities}}
+                  <option value="{{ p.value }}">{{ p.label }}</option>
+{{/each}}
+                </select>
+                <p id="rp-priority-hint" class="text-xs text-muted -mt-3 mb-3">{{ priorityHint(repairPriority) }}</p>
+              </div>
+            </div>
+            <label class="tx-label" for="rp-title">Short summary</label>
+            <input id="rp-title" class="tx-input" maxlength="150" placeholder="e.g. Kitchen sink is leaking" bind:value="{{ repairTitle }}" aria-invalid="{{ fieldError(repairErrors, 'title') ? 'true' : 'false' }}" />
+{{#if fieldError(repairErrors, "title")}}<p class="text-xs text-coral -mt-3 mb-3">{{ fieldError(repairErrors, "title") }}</p>{{/if}}
+            <label class="tx-label" for="rp-description">Details</label>
+            <textarea id="rp-description" class="tx-input" rows="4" maxlength="2000" placeholder="Where exactly, since when, and anything you've noticed. Say if someone needs to be home to let the fundi in." bind:value="{{ repairDescription }}" aria-invalid="{{ fieldError(repairErrors, 'description') ? 'true' : 'false' }}"></textarea>
+{{#if fieldError(repairErrors, "description")}}<p class="text-xs text-coral -mt-3 mb-3">{{ fieldError(repairErrors, "description") }}</p>{{/if}}
+            <label class="tx-label" for="rp-contact">Phone for the technician</label>
+            <input id="rp-contact" class="tx-input" type="tel" placeholder="0712 345 678" bind:value="{{ repairContact }}" aria-invalid="{{ fieldError(repairErrors, 'reported_contact') ? 'true' : 'false' }}" />
+{{#if fieldError(repairErrors, "reported_contact")}}<p class="text-xs text-coral -mt-3 mb-3">{{ fieldError(repairErrors, "reported_contact") }}</p>{{/if}}
+{{#if repairPriority is "urgent"}}
+            <div class="tx-alert tx-alert-error mb-3"><p class="text-sm flex items-start gap-2"><IconExclamationTriangle class="w-4 h-4 mt-0.5 shrink-0" /> For flooding, sparks, gas or anything dangerous, send this and also call the office straight away.</p></div>
+{{/if}}
+            <div class="flex flex-wrap gap-2">
+              <button type="submit" class="tx-btn tx-btn-primary tx-btn-sm" disabled="{{ repairBusy }}">{{ repairBusy ? "Sending…" : "Send to the office" }}</button>
+              <button type="button" class="tx-btn tx-btn-ghost tx-btn-sm" onclick="{{ repairFormOpen = false }}">Cancel</button>
+            </div>
+          </form>
+{{/if}}
+{{#if repairsLoaded and repairs.length is 0 and not repairFormOpen}}
+          <p class="p-4 text-sm text-muted">No repair requests yet.</p>
+{{#else if repairs.length > 0}}
+          <ul class="divide-y divide-line">
+{{#each r in repairs}}
+            <li class="p-4 flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <p class="text-sm font-medium">{{ r.title }} <span class="text-xs text-muted font-normal">#{{ r.id }}</span></p>
+                <p class="text-xs text-muted">{{ categoryLabel(r.category) }} · {{ Fmt.label(r.priority) }} priority · reported {{ Fmt.ago(r.created_at) }}{{ r.scheduled_at and not r.resolved_at ? " · visit " + Fmt.dateTime(r.scheduled_at) : "" }}{{ r.resolved_at ? " · fixed " + Fmt.date(r.resolved_at) : "" }}</p>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <span class="{{ repairChip(r.status) }}">{{ repairStatus(r.status) }}</span>
+{{#if r.can_cancel}}
+                <button class="tx-icon-btn" disabled="{{ cancellingId is r.id }}" onclick="{{ cancelRepair(r) }}" aria-label="{{ 'Cancel request ' + r.id }}" title="Cancel request"><IconX class="w-4 h-4" /></button>
+{{/if}}
+              </div>
+            </li>
+{{/each}}
+          </ul>
 {{/if}}
         </section>
 
@@ -466,14 +683,14 @@ template
           <div class="grid sm:grid-cols-3 gap-x-3">
             <div>
               <label class="tx-label" for="st-period">Period</label>
-              <select id="st-period" class="tx-input" value="{{ preset }}" onchange="{{ applyPreset(event.target.value) }}">
-                <option value="month">This month</option>
-                <option value="3m">Last 3 months</option>
-                <option value="6m">Last 6 months</option>
-                <option value="12m">Last 12 months</option>
-                <option value="year">This year</option>
-                <option value="last-year">Last year</option>
-                <option value="custom">Custom dates</option>
+              <select id="st-period" class="tx-input" onchange="{{ applyPreset(event.target.value) }}">
+                <option value="month" selected="{{ preset is 'month' }}">This month</option>
+                <option value="3m" selected="{{ preset is '3m' }}">Last 3 months</option>
+                <option value="6m" selected="{{ preset is '6m' }}">Last 6 months</option>
+                <option value="12m" selected="{{ preset is '12m' }}">Last 12 months</option>
+                <option value="year" selected="{{ preset is 'year' }}">This year</option>
+                <option value="last-year" selected="{{ preset is 'last-year' }}">Last year</option>
+                <option value="custom" selected="{{ preset is 'custom' }}">Custom dates</option>
               </select>
             </div>
             <div>

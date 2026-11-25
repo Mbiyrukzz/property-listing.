@@ -53,8 +53,9 @@ template
 {{#each link in links}}
           <a href="{{ link.href }}" class="{{ linkClass(link.href) }}">{{ link.label }}</a>
 {{/each}}
-          <a href="/p/about#landlords" class="hidden xl:inline-flex bb-nav-link">For landlords</a>
+          <a href="/p/about#landlords" class="hidden 2xl:inline-flex bb-nav-link">For landlords</a>
           <a href="/tenant" class="{{ linkClass('/tenant') }}">Tenant portal</a>
+          <a href="/landlord" class="{{ 'hidden xl:inline-flex ' + linkClass('/landlord') }}">Landlord portal</a>
         </div>
       </div>
 
@@ -107,6 +108,7 @@ template
           <a href="/p/about#landlords" onclick="{{ closeMobileMenu() }}" class="{{ sheetClass('/p/about') }}"><IconBuildingOffice /> For landlords</a>
           <a href="/contact" onclick="{{ closeMobileMenu() }}" class="{{ sheetClass('/contact') }}"><IconChatBubble /> Contact us</a>
           <a href="/tenant" onclick="{{ closeMobileMenu() }}" class="{{ sheetClass('/tenant') }}"><IconMobileMoney /> Tenant portal</a>
+          <a href="/landlord" onclick="{{ closeMobileMenu() }}" class="{{ sheetClass('/landlord') }}"><IconBuildingOffice /> Landlord portal</a>
         </div>
 
         <div class="h-px bg-line my-3 mx-2"></div>

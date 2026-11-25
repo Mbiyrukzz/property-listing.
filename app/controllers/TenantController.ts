@@ -1,12 +1,13 @@
 // Tenant portal: a tenant signs in with their account number and the phone
 // on file (SMS code), with no website account, then reads balances,
-// invoices and receipts, downloads invoice and statement PDFs, and pays
-// rent by M-Pesa.
+// invoices and receipts, downloads invoice and statement PDFs, pays rent by
+// M-Pesa, and reports repairs (maintenance requests go to HQ's queue).
 //
-// Properman stays the record for rent: balances and receipts are read from it
-// on each visit, and payments go through Properman's own STK flow, which
-// applies the money and sends the receipt SMS. Barani Better Homes keeps only a
-// rent_payments row so the tenant can follow the request.
+// Properman stays the record for rent and repairs: balances, receipts and
+// requests are read from it on each visit, and payments go through
+// Properman's own STK flow, which applies the money and sends the receipt
+// SMS. Barani Better Homes keeps only a rent_payments row so the tenant can
+// follow the request.
 //
 // The tenant id sent to Properman always comes from the tenant session
 // (app/services/TenantAuth), never from the request.
@@ -15,39 +16,21 @@ import type { TylixRequest, TylixResponse } from "@tylix/core";
 import { createRateLimiter } from "@tylix/core";
 import { RentPayment } from "../models/RentPayment.js";
 import { Properman, isConfigured } from "../services/Properman.js";
-import { sendSms, smsConfigured } from "../services/Sms.js";
-import { currentTenant, endTenantSession, startTenantSession, type CurrentTenant } from "../services/TenantAuth.js";
+import { currentTenant, endTenantSession, startTenantSession, type CurrentTenant, type TenantIdentity } from "../services/TenantAuth.js";
+import { firstError, periodRange, redirectTo, signedOut as portalSignedOut, smsLogin, tooMany, unprocessable } from "../services/PortalLogin.js";
 import { getSettings } from "../services/site.js";
-import { validatePayment, validateTenantLogin } from "../validators/ListingValidators.js";
+import { validateMaintenance, validatePayment, validateTenantLogin } from "../validators/ListingValidators.js";
 import { invoicePdf } from "../pdfs/InvoicePdf.js";
 import { statementPdf } from "../pdfs/StatementPdf.js";
 import { fileSafe, todayIso } from "../pdfs/shared.js";
 
 type Row = Record<string, any>;
 
-// Sign-in is open to anyone, so it is limited per address and per account.
-const loginIpLimiter = createRateLimiter({ name: "tenant-login-ip", max: 10, windowMs: 15 * 60_000, store: "shared" });
-const loginAccountLimiter = createRateLimiter({ name: "tenant-login-account", max: 5, windowMs: 15 * 60_000, store: "shared" });
-const confirmIpLimiter = createRateLimiter({ name: "tenant-confirm-ip", max: 20, windowMs: 15 * 60_000, store: "shared" });
-const confirmAccountLimiter = createRateLimiter({ name: "tenant-confirm-account", max: 10, windowMs: 15 * 60_000, store: "shared" });
 const payLimiter = createRateLimiter({ name: "tenant-pay", max: 5, windowMs: 10 * 60_000, store: "shared" });
 const documentLimiter = createRateLimiter({ name: "tenant-documents", max: 30, windowMs: 10 * 60_000, store: "shared" });
+const maintenanceLimiter = createRateLimiter({ name: "tenant-maintenance", max: 5, windowMs: 60 * 60_000, store: "shared" });
 
 const MAX_STATEMENT_YEARS = 5;
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
-function clientIp(req: TylixRequest): string {
-    return String((req as unknown as { ip?: string }).ip ?? "unknown");
-}
-
-function accountKey(value: unknown): string {
-    return String(value ?? "").trim().toLowerCase().slice(0, 60);
-}
-
-function tooMany(res: TylixResponse, message = "Too many attempts. Wait 15 minutes and try again.") {
-    res.status(429);
-    return res.json({ error: message });
-}
 
 function unavailable(res: TylixResponse, err?: unknown) {
     if (err) console.error("[tenant] HQ call failed:", err instanceof Error ? err.message : err);
@@ -55,35 +38,27 @@ function unavailable(res: TylixResponse, err?: unknown) {
     return res.json({ error: "The tenant portal can't reach the rent system right now. Please try again shortly." });
 }
 
-// 403 rather than 401: the frontend client answers a 401 by refreshing the
-// website-account session, which has nothing to do with this one.
 function signedOut(res: TylixResponse) {
-    res.status(403);
-    return res.json({ error: "Your tenant portal session has ended. Sign in again.", code: "TENANT_SIGNED_OUT" });
+    return portalSignedOut(res, "TENANT_SIGNED_OUT", "Your tenant portal session has ended. Sign in again.");
 }
 
-// PDFs open in a new tab, so a signed-out visitor goes back to the sign-in.
 function backToPortal(res: TylixResponse) {
-    res.statusCode = 302;
-    res.setHeader("Location", "/tenant");
-    res.setHeader("Cache-Control", "no-store");
-    res.end();
+    redirectTo(res, "/tenant");
 }
 
-function firstError(data: any): string | null {
-    const errors = data?.errors;
-    if (errors && typeof errors === "object") {
-        const key = Object.keys(errors)[0];
-        if (key && Array.isArray(errors[key])) return String(errors[key][0]);
-    }
-    return typeof data?.error === "string" ? data.error : null;
-}
-
-function isRealDate(text: string): boolean {
-    if (!DATE_RE.test(text)) return false;
-    const d = new Date(`${text}T00:00:00Z`);
-    return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === text;
-}
+const login = smsLogin<TenantIdentity>({
+    name: "tenant",
+    validate: validateTenantLogin,
+    unavailable,
+    start: (account, phone, deliverBy) => Properman.startTenantVerification(account, phone, deliverBy),
+    confirm: (account, phone, code) => Properman.confirmTenantVerification(account, phone, code),
+    smsText: (code, ttl) => `Your Barani Better Homes tenant portal code is ${code}. It expires in ${ttl} minutes. Do not share it.`,
+    sentMessage: "If those details match your tenancy, we've sent a 6-digit code by SMS to the phone your landlord has on file.",
+    identify: (t) => t.tenant_id
+        ? { tenantId: Number(t.tenant_id), name: String(t.name ?? ""), accountNumber: String(t.account_number ?? ""), phone: String(t.phone ?? "") }
+        : null,
+    startSession: startTenantSession,
+});
 
 export class TenantController {
     async status(req: TylixRequest, res: TylixResponse) {
@@ -108,85 +83,12 @@ export class TenantController {
 
     // Step 1: account number + phone. Texts a code if they match a tenancy.
     async startLogin(req: TylixRequest, res: TylixResponse) {
-        if (!isConfigured()) return unavailable(res);
-        if (!(await loginIpLimiter(clientIp(req))).allowed) return tooMany(res);
-
-        const result = validateTenantLogin(req.body ?? {});
-        if (!result.valid) {
-            res.status(422);
-            return res.json({ errors: result.errors });
-        }
-        if (!(await loginAccountLimiter(accountKey(req.body.account_number))).allowed) return tooMany(res);
-
-        try {
-            // With Ashmif set up, this app texts the code itself; otherwise
-            // Properman sends it through its own SMS provider.
-            const ownSms = smsConfigured();
-            const reply = await Properman.startTenantVerification(
-                String(req.body.account_number).trim(),
-                String(req.body.phone).replace(/[\s-]/g, ""),
-                ownSms ? "caller" : "properman",
-            );
-            if (reply.status === 429) return tooMany(res, "Too many attempts. Wait a few minutes and try again.");
-            if (!reply.ok) return unavailable(res);
-
-            // `delivery` is only present when the details matched a tenancy
-            // and a fresh code was issued. It never goes back to the browser,
-            // so the reply below is the same either way.
-            const delivery = reply.data?.delivery;
-            if (ownSms && delivery?.code && delivery?.phone) {
-                const ttl = Number(delivery.ttl_minutes) || 10;
-                const sent = await sendSms(
-                    String(delivery.phone),
-                    `Your Barani Better Homes tenant portal code is ${delivery.code}. It expires in ${ttl} minutes. Do not share it.`,
-                );
-                if (!sent) console.error("[tenant] sign-in SMS was not delivered");
-            }
-            return res.json({
-                sent: true,
-                message: "If those details match your tenancy, we've sent a 6-digit code by SMS to the phone your landlord has on file.",
-            });
-        } catch (err) {
-            return unavailable(res, err);
-        }
+        return login.start(req, res);
     }
 
     // Step 2: the code. Starts a tenant session (cookie) when it's right.
     async confirmLogin(req: TylixRequest, res: TylixResponse) {
-        if (!isConfigured()) return unavailable(res);
-        if (!(await confirmIpLimiter(clientIp(req))).allowed) return tooMany(res);
-
-        const result = validateTenantLogin(req.body ?? {});
-        const code = String(req.body?.code ?? "").trim();
-        if (!result.valid || !/^\d{6}$/.test(code)) {
-            res.status(422);
-            return res.json({ errors: { ...(result.errors ?? {}), ...(/^\d{6}$/.test(code) ? {} : { code: ["Enter the 6-digit code."] }) } });
-        }
-        if (!(await confirmAccountLimiter(accountKey(req.body.account_number))).allowed) return tooMany(res);
-
-        try {
-            const reply = await Properman.confirmTenantVerification(
-                String(req.body.account_number).trim(),
-                String(req.body.phone).replace(/[\s-]/g, ""),
-                code,
-            );
-            if (reply.status === 422) {
-                res.status(422);
-                return res.json({ errors: { code: [firstError(reply.data) ?? "That code is wrong or has expired."] } });
-            }
-            if (!reply.ok || !reply.data?.data?.tenant_id) return unavailable(res);
-
-            const t = reply.data.data;
-            await startTenantSession(req, res, {
-                tenantId: Number(t.tenant_id),
-                name: String(t.name ?? ""),
-                accountNumber: String(t.account_number ?? ""),
-                phone: String(t.phone ?? ""),
-            });
-            return res.json({ signedIn: true });
-        } catch (err) {
-            return unavailable(res, err);
-        }
+        return login.confirm(req, res);
     }
 
     async logout(req: TylixRequest, res: TylixResponse) {
@@ -264,21 +166,8 @@ export class TenantController {
         }
     }
 
-    statementRange(fromValue: unknown, toValue: unknown): { from: string; to: string } | { field: string; error: string } {
-        const today = todayIso();
-        const from = String(fromValue ?? "").trim();
-        const to = String(toValue ?? "").trim() || today;
-        if (!isRealDate(from)) return { field: "from", error: "Choose a start date." };
-        if (!isRealDate(to)) return { field: "to", error: "Choose an end date." };
-        if (from > to) return { field: "from", error: "The start date must be before the end date." };
-        if (from > today) return { field: "from", error: "The start date can't be in the future." };
-
-        const earliest = new Date(`${to}T00:00:00Z`);
-        earliest.setUTCFullYear(earliest.getUTCFullYear() - MAX_STATEMENT_YEARS);
-        if (from < earliest.toISOString().slice(0, 10)) {
-            return { field: "from", error: `A statement can cover up to ${MAX_STATEMENT_YEARS} years.` };
-        }
-        return { from, to: to > today ? today : to };
+    statementRange(fromValue: unknown, toValue: unknown) {
+        return periodRange(fromValue, toValue, todayIso(), MAX_STATEMENT_YEARS);
     }
 
     async payments(req: TylixRequest, res: TylixResponse) {
@@ -312,10 +201,7 @@ export class TenantController {
         }
 
         const result = validatePayment(req.body ?? {});
-        if (!result.valid) {
-            res.status(422);
-            return res.json({ errors: result.errors });
-        }
+        if (!result.valid) return unprocessable(res, result.errors ?? {});
 
         const phone = String(req.body.phone).replace(/[\s-]/g, "");
         const amount = Math.round(Number(req.body.amount));
@@ -384,6 +270,72 @@ export class TenantController {
         return res.json({
             data: { id: row.id, status: row.status, amount: Number(row.amount), mpesaReceipt: row.mpesa_receipt, message: row.message },
         });
+    }
+
+    // Maintenance requests: HQ keeps them; the tenant sees their own.
+    async maintenance(req: TylixRequest, res: TylixResponse) {
+        const tenant = await currentTenant(req);
+        if (!tenant) return signedOut(res);
+        try {
+            const reply = await Properman.tenantMaintenance(tenant.tenantId);
+            if (!reply.ok) return unavailable(res);
+            return res.json({ data: reply.data?.data ?? [] });
+        } catch (err) {
+            return unavailable(res, err);
+        }
+    }
+
+    async reportMaintenance(req: TylixRequest, res: TylixResponse) {
+        const tenant = await currentTenant(req);
+        if (!tenant) return signedOut(res);
+
+        const body = req.body ?? {};
+        const result = validateMaintenance(body);
+        if (!result.valid) return unprocessable(res, result.errors ?? {});
+        if (!(await maintenanceLimiter(`t:${tenant.tenantId}`)).allowed) {
+            return tooMany(res, "You've sent several requests in the last hour. Call the office if it's an emergency.");
+        }
+
+        try {
+            const reply = await Properman.createTenantMaintenance(tenant.tenantId, {
+                title: String(body.title).trim(),
+                description: String(body.description).trim(),
+                category: body.category,
+                priority: body.priority,
+                reported_contact: String(body.reported_contact ?? "").replace(/[\s-]/g, "") || tenant.phone,
+            });
+            if (reply.status === 422) {
+                res.status(422);
+                return res.json(reply.data?.errors ? { errors: reply.data.errors } : { error: firstError(reply.data) ?? "Check the details and try again." });
+            }
+            if (!reply.ok || !reply.data?.data) return unavailable(res);
+            res.status(reply.status === 201 ? 201 : 200);
+            return res.json({ data: reply.data.data, duplicate: Boolean(reply.data.duplicate) });
+        } catch (err) {
+            return unavailable(res, err);
+        }
+    }
+
+    async cancelMaintenance(req: TylixRequest, res: TylixResponse) {
+        const tenant = await currentTenant(req);
+        if (!tenant) return signedOut(res);
+        const id = Number(req.params.id);
+        if (!Number.isInteger(id) || id < 1) {
+            res.status(404);
+            return res.json({ error: "Request not found." });
+        }
+        try {
+            // HQ only cancels a request of this tenant that nobody has picked up.
+            const reply = await Properman.cancelTenantMaintenance(tenant.tenantId, id);
+            if (reply.status === 404 || reply.status === 409) {
+                res.status(reply.status);
+                return res.json({ error: firstError(reply.data) ?? "That request can't be cancelled." });
+            }
+            if (!reply.ok || !reply.data?.data) return unavailable(res);
+            return res.json({ data: reply.data.data });
+        } catch (err) {
+            return unavailable(res, err);
+        }
     }
 
     async ownPayment(tenant: CurrentTenant, id: number): Promise<Row | null> {

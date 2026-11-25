@@ -481,6 +481,69 @@ export interface ApiRoutes {
     response: unknown
     auth: false
   }
+  "GET /api/landlord": {
+    params: Record<string, never>
+    query: Record<string, string | number | boolean | undefined>
+    body: undefined
+    response: unknown
+    auth: false
+  }
+  "POST /api/landlord/login": {
+    params: Record<string, never>
+    query: Record<string, string | number | boolean | undefined>
+    body: Record<string, unknown>
+    response: unknown
+    auth: false
+  }
+  "POST /api/landlord/login/confirm": {
+    params: Record<string, never>
+    query: Record<string, string | number | boolean | undefined>
+    body: Record<string, unknown>
+    response: unknown
+    auth: false
+  }
+  "POST /api/landlord/logout": {
+    params: Record<string, never>
+    query: Record<string, string | number | boolean | undefined>
+    body: Record<string, unknown>
+    response: unknown
+    auth: false
+  }
+  "GET /api/landlord/maintenance": {
+    params: Record<string, never>
+    query: Record<string, string | number | boolean | undefined>
+    body: undefined
+    response: unknown
+    auth: false
+  }
+  "GET /api/landlord/payouts": {
+    params: Record<string, never>
+    query: Record<string, string | number | boolean | undefined>
+    body: undefined
+    response: unknown
+    auth: false
+  }
+  "GET /api/landlord/payouts/:id/pdf": {
+    params: { id: string | number }
+    query: Record<string, string | number | boolean | undefined>
+    body: undefined
+    response: unknown
+    auth: false
+  }
+  "GET /api/landlord/statement/pdf": {
+    params: Record<string, never>
+    query: Record<string, string | number | boolean | undefined>
+    body: undefined
+    response: unknown
+    auth: false
+  }
+  "GET /api/landlord/units": {
+    params: Record<string, never>
+    query: Record<string, string | number | boolean | undefined>
+    body: undefined
+    response: unknown
+    auth: false
+  }
   "GET /api/listings": {
     params: Record<string, never>
     query: Record<string, string | number | boolean | undefined>
@@ -642,6 +705,27 @@ export interface ApiRoutes {
     response: unknown
     auth: false
   }
+  "GET /api/tenant/maintenance": {
+    params: Record<string, never>
+    query: Record<string, string | number | boolean | undefined>
+    body: undefined
+    response: unknown
+    auth: false
+  }
+  "POST /api/tenant/maintenance": {
+    params: Record<string, never>
+    query: Record<string, string | number | boolean | undefined>
+    body: Record<string, unknown>
+    response: unknown
+    auth: false
+  }
+  "POST /api/tenant/maintenance/:id/cancel": {
+    params: { id: string | number }
+    query: Record<string, string | number | boolean | undefined>
+    body: Record<string, unknown>
+    response: unknown
+    auth: false
+  }
   "POST /api/tenant/pay": {
     params: Record<string, never>
     query: Record<string, string | number | boolean | undefined>
@@ -794,6 +878,23 @@ export interface RouteClient {
       webhook(body?: ApiRoutes["POST /api/integrations/hq/webhook"]['body'], options?: RouteOptions<ApiRoutes["POST /api/integrations/hq/webhook"]['query']>): Promise<ApiResult<ApiRoutes["POST /api/integrations/hq/webhook"]['response']>>
     }
   }
+  landlord: {
+    index(options?: RouteOptions<ApiRoutes["GET /api/landlord"]['query']>): Promise<ApiResult<ApiRoutes["GET /api/landlord"]['response']>>
+    login: {
+      store(body?: ApiRoutes["POST /api/landlord/login"]['body'], options?: RouteOptions<ApiRoutes["POST /api/landlord/login"]['query']>): Promise<ApiResult<ApiRoutes["POST /api/landlord/login"]['response']>>
+      confirm(body?: ApiRoutes["POST /api/landlord/login/confirm"]['body'], options?: RouteOptions<ApiRoutes["POST /api/landlord/login/confirm"]['query']>): Promise<ApiResult<ApiRoutes["POST /api/landlord/login/confirm"]['response']>>
+    }
+    logout(body?: ApiRoutes["POST /api/landlord/logout"]['body'], options?: RouteOptions<ApiRoutes["POST /api/landlord/logout"]['query']>): Promise<ApiResult<ApiRoutes["POST /api/landlord/logout"]['response']>>
+    maintenance(options?: RouteOptions<ApiRoutes["GET /api/landlord/maintenance"]['query']>): Promise<ApiResult<ApiRoutes["GET /api/landlord/maintenance"]['response']>>
+    payouts: {
+      index(options?: RouteOptions<ApiRoutes["GET /api/landlord/payouts"]['query']>): Promise<ApiResult<ApiRoutes["GET /api/landlord/payouts"]['response']>>
+      pdf(params: ApiRoutes["GET /api/landlord/payouts/:id/pdf"]['params'], options?: RouteOptions<ApiRoutes["GET /api/landlord/payouts/:id/pdf"]['query']>): Promise<ApiResult<ApiRoutes["GET /api/landlord/payouts/:id/pdf"]['response']>>
+    }
+    statement: {
+      pdf(options?: RouteOptions<ApiRoutes["GET /api/landlord/statement/pdf"]['query']>): Promise<ApiResult<ApiRoutes["GET /api/landlord/statement/pdf"]['response']>>
+    }
+    units(options?: RouteOptions<ApiRoutes["GET /api/landlord/units"]['query']>): Promise<ApiResult<ApiRoutes["GET /api/landlord/units"]['response']>>
+  }
   listings: {
     index(options?: RouteOptions<ApiRoutes["GET /api/listings"]['query']>): Promise<ApiResult<ApiRoutes["GET /api/listings"]['response']>>
     show(params: ApiRoutes["GET /api/listings/:slug"]['params'], options?: RouteOptions<ApiRoutes["GET /api/listings/:slug"]['query']>): Promise<ApiResult<ApiRoutes["GET /api/listings/:slug"]['response']>>
@@ -830,6 +931,11 @@ export interface RouteClient {
       confirm(body?: ApiRoutes["POST /api/tenant/login/confirm"]['body'], options?: RouteOptions<ApiRoutes["POST /api/tenant/login/confirm"]['query']>): Promise<ApiResult<ApiRoutes["POST /api/tenant/login/confirm"]['response']>>
     }
     logout(body?: ApiRoutes["POST /api/tenant/logout"]['body'], options?: RouteOptions<ApiRoutes["POST /api/tenant/logout"]['query']>): Promise<ApiResult<ApiRoutes["POST /api/tenant/logout"]['response']>>
+    maintenance: {
+      index(options?: RouteOptions<ApiRoutes["GET /api/tenant/maintenance"]['query']>): Promise<ApiResult<ApiRoutes["GET /api/tenant/maintenance"]['response']>>
+      store(body?: ApiRoutes["POST /api/tenant/maintenance"]['body'], options?: RouteOptions<ApiRoutes["POST /api/tenant/maintenance"]['query']>): Promise<ApiResult<ApiRoutes["POST /api/tenant/maintenance"]['response']>>
+      cancel(params: ApiRoutes["POST /api/tenant/maintenance/:id/cancel"]['params'], body?: ApiRoutes["POST /api/tenant/maintenance/:id/cancel"]['body'], options?: RouteOptions<ApiRoutes["POST /api/tenant/maintenance/:id/cancel"]['query']>): Promise<ApiResult<ApiRoutes["POST /api/tenant/maintenance/:id/cancel"]['response']>>
+    }
     pay: {
       store(body?: ApiRoutes["POST /api/tenant/pay"]['body'], options?: RouteOptions<ApiRoutes["POST /api/tenant/pay"]['query']>): Promise<ApiResult<ApiRoutes["POST /api/tenant/pay"]['response']>>
       show(params: ApiRoutes["GET /api/tenant/pay/:id"]['params'], options?: RouteOptions<ApiRoutes["GET /api/tenant/pay/:id"]['query']>): Promise<ApiResult<ApiRoutes["GET /api/tenant/pay/:id"]['response']>>

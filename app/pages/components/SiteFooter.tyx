@@ -20,6 +20,7 @@ state
     { label: "My account", href: "/dashboard" },
     { label: "Saved properties", href: "/account/saved" },
     { label: "Tenant portal", href: "/tenant" },
+    { label: "Landlord portal", href: "/landlord" },
     { label: "Create an account", href: "/register" }
   ]
 

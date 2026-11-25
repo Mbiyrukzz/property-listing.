@@ -126,6 +126,33 @@ export function validateTenantLogin(data: Record<string, unknown>) {
     });
 }
 
+export function validateLandlordLogin(data: Record<string, unknown>) {
+    return validate({ ...data, phone: compactPhone(data.phone) }, {
+        account_number: [withMessage(required, "Enter your landlord account number (it is on your payout statements)."), isString, maxLength(60)],
+        phone: [withMessage(required, "Enter the phone number the office has on file for you."), phone],
+    });
+}
+
+// The values HQ accepts (Properman MaintenanceRequest::CATEGORIES / PRIORITIES).
+export const MAINTENANCE_CATEGORIES = ["plumbing", "electrical", "appliance", "structural", "pest", "other"];
+export const MAINTENANCE_PRIORITIES = ["low", "medium", "high", "urgent"];
+
+export function validateMaintenance(data: Record<string, unknown>) {
+    const trimmed = {
+        ...data,
+        title: typeof data.title === "string" ? data.title.trim() : data.title,
+        description: typeof data.description === "string" ? data.description.trim() : data.description,
+        reported_contact: compactPhone(data.reported_contact) || undefined,
+    };
+    return validate(trimmed, {
+        title: [withMessage(required, "Say in a few words what needs fixing."), isString, minLength(3), maxLength(150)],
+        description: [withMessage(required, "Describe the problem, where it is and since when."), isString, minLength(10), maxLength(2000)],
+        category: [withMessage(required, "Pick a category."), oneOf(MAINTENANCE_CATEGORIES)],
+        priority: [withMessage(required, "Pick how urgent it is."), oneOf(MAINTENANCE_PRIORITIES)],
+        reported_contact: [phone],
+    });
+}
+
 export function validatePayment(data: Record<string, unknown>) {
     return validate({ ...data, phone: compactPhone(data.phone) }, {
         phone: [

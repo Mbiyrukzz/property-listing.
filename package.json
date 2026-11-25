@@ -7,7 +7,7 @@
     "build": "tylix build",
     "start": "tylix start",
     "migrate": "tylix migrate",
-    "test": "node --import tsx --test \"tests/**/*.test.ts\"",
+    "test": "node --import tsx --test --test-concurrency=1 \"tests/**/*.test.ts\"",
     "doctor": "tylix doctor",
     "tinker": "tylix tinker",
     "css:build": "tailwindcss -i ./app/tailwind-input.css -o ./public/tailwind.css",

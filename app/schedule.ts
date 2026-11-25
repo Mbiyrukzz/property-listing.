@@ -1,6 +1,7 @@
 import type { Scheduler } from '@tylix/core'
 import { syncAll } from './services/ListingSync.js'
 import { pruneTenantSessions } from './services/TenantAuth.js'
+import { pruneLandlordSessions } from './services/LandlordAuth.js'
 
 export async function schedule(scheduler: Scheduler) {
   // The safety net behind Properman's webhooks: re-read every published
@@ -10,8 +11,9 @@ export async function schedule(scheduler: Scheduler) {
     await syncAll('schedule')
   })
 
-  // Tenant portal sessions that expired or went idle (app/services/TenantAuth).
+  // Portal sessions that expired or went idle (app/services/PortalSession).
   scheduler.every('6h', async () => {
     await pruneTenantSessions()
+    await pruneLandlordSessions()
   })
 }

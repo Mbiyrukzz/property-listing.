@@ -1,0 +1,735 @@
+page LandlordPortal
+
+import { IconKey, IconCheck, IconRefresh, IconLogout, IconDocumentText, IconDownload, IconHome, IconBanknote, IconTool, IconExternalLink, IconChartBar, IconMobileMoney, IconExclamationTriangle } from "tylix-icons"
+
+title "Landlord portal | Barani Better Homes"
+
+uses
+  Fmt
+
+state
+  loading: true
+  enabled: true
+  signedIn: false
+  ended: false
+  unreachable: false
+  landlord: null
+  summary: null
+  step: "details"
+  accountNumber: ""
+  loginPhone: ""
+  code: ""
+  loginErrors: {}
+  loginMessage: ""
+  loginBusy: false
+  resendAt: 0
+  tab: "overview"
+  units: []
+  unitsLoaded: false
+  unitFilter: "vacant"
+  payouts: []
+  payoutsLoaded: false
+  repairs: []
+  repairsLoaded: false
+  repairFilter: "open"
+  hoverBar: -1
+  preset: "year"
+  statementFrom: ""
+  statementTo: ""
+  perks: [
+    "Same sign-in as tenants: your account number and an SMS code",
+    "Rent collected, arrears and occupancy for every property",
+    "Every payout with its fees and deductions, as a PDF",
+    "Income statements for any period, ready for your accountant",
+    "Vacant units and repairs on your properties"
+  ]
+
+computed
+  totals() {
+    return this.summary ? this.summary.totals : null
+  }
+
+  properties() {
+    return this.summary ? this.summary.properties : []
+  }
+
+  monthly() {
+    return this.summary ? this.summary.monthly : []
+  }
+
+  monthlyMax() {
+    return Math.max(1, ...this.monthly.map((m) => m.paid))
+  }
+
+  monthlyTotal() {
+    return this.monthly.reduce((sum, m) => sum + m.paid, 0)
+  }
+
+  vacantUnits() {
+    return this.units.filter((u) => u.vacant)
+  }
+
+  shownUnits() {
+    if this.unitFilter is "vacant" {
+      return this.units.filter((u) => u.vacant)
+    }
+    if this.unitFilter is "arrears" {
+      return this.units.filter((u) => not u.vacant and u.tenant and u.tenant.arrears > 0)
+    }
+    return this.units
+  }
+
+  openRepairs() {
+    return this.repairs.filter((r) => r.open)
+  }
+
+  shownRepairs() {
+    return this.repairFilter is "open" ? this.repairs.filter((r) => r.open) : this.repairs
+  }
+
+  statementError() {
+    if not this.statementFrom or not this.statementTo {
+      return "Choose a start and end date."
+    }
+    if this.statementFrom > this.statementTo {
+      return "The start date must be before the end date."
+    }
+    if this.statementFrom > this.today() {
+      return "The start date can't be in the future."
+    }
+    return ""
+  }
+
+  statementUrl() {
+    return "/api/landlord/statement/pdf?from=" + encodeURIComponent(this.statementFrom) + "&to=" + encodeURIComponent(this.statementTo)
+  }
+
+action
+  fieldError(errors, field) {
+    const list = errors[field]
+    return Array.isArray(list) and list.length > 0 ? list[0] : ""
+  }
+
+  isoDate(d) {
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, "0")
+    const day = String(d.getDate()).padStart(2, "0")
+    return y + "-" + m + "-" + day
+  }
+
+  today() {
+    return this.isoDate(new Date())
+  }
+
+  applyPreset(value) {
+    this.preset = value
+    const now = new Date()
+    const y = now.getFullYear()
+    const m = now.getMonth()
+    if value is "custom" {
+      return null
+    }
+    this.statementTo = this.isoDate(now)
+    if value is "month" {
+      this.statementFrom = this.isoDate(new Date(y, m, 1))
+    } else if value is "last-month" {
+      this.statementFrom = this.isoDate(new Date(y, m - 1, 1))
+      this.statementTo = this.isoDate(new Date(y, m, 0))
+    } else if value is "3m" {
+      this.statementFrom = this.isoDate(new Date(y, m - 2, 1))
+    } else if value is "12m" {
+      this.statementFrom = this.isoDate(new Date(y, m - 11, 1))
+    } else if value is "year" {
+      this.statementFrom = this.isoDate(new Date(y, 0, 1))
+    } else if value is "last-year" {
+      this.statementFrom = this.isoDate(new Date(y - 1, 0, 1))
+      this.statementTo = this.isoDate(new Date(y - 1, 11, 31))
+    }
+  }
+
+  setStatementDate(field, value) {
+    this[field] = value
+    this.preset = "custom"
+  }
+
+  segClass(value, current) {
+    return value is current ? "is-on" : ""
+  }
+
+  barHeight(value, max) {
+    return "height: " + Math.max(value > 0 ? 3 : 0, Math.round(value / max * 100)) + "%"
+  }
+
+  monthLabel(ym) {
+    const parts = String(ym).split("-")
+    const d = new Date(Number(parts[0]), Number(parts[1]) - 1, 1)
+    return d.toLocaleDateString("en-KE", { month: "short", year: "numeric" })
+  }
+
+  daysSince(date) {
+    if not date {
+      return null
+    }
+    const ms = Date.now() - new Date(date + "T00:00:00").getTime()
+    return Math.max(0, Math.floor(ms / 86400000))
+  }
+
+  vacantFor(u) {
+    const days = this.daysSince(u.vacant_since)
+    if days is null {
+      return "Vacant"
+    }
+    if days is 0 {
+      return "Vacant since today"
+    }
+    return "Vacant " + days + (days is 1 ? " day" : " days")
+  }
+
+  occupancy(p) {
+    return p.units > 0 ? Math.round(p.occupied / p.units * 100) : 0
+  }
+
+  payoutChip(status) {
+    if status is "paid" {
+      return "bb-chip bb-chip-ok"
+    }
+    if status is "failed" {
+      return "bb-chip bb-chip-bad"
+    }
+    return "bb-chip bb-chip-warn"
+  }
+
+  payoutStatus(status) {
+    if status is "processing" {
+      return "Being paid"
+    }
+    if status is "failed" {
+      return "Payout failed"
+    }
+    return "Paid"
+  }
+
+  payoutPdf(p, download) {
+    return "/api/landlord/payouts/" + p.id + "/pdf" + (download ? "?download=1" : "")
+  }
+
+  payoutMode(mode) {
+    if mode is "personal" {
+      return "M-Pesa"
+    }
+    if mode is "business" {
+      return "M-Pesa business (Paybill/Till)"
+    }
+    return Fmt.label(mode)
+  }
+
+  repairStatus(status) {
+    if status is "submitted" {
+      return "New"
+    }
+    if status is "acknowledged" {
+      return "Seen by office"
+    }
+    if status is "resolved" {
+      return "Fixed"
+    }
+    return Fmt.label(status)
+  }
+
+  repairChip(r) {
+    if not r.open {
+      return r.status is "cancelled" ? "bb-chip" : "bb-chip bb-chip-ok"
+    }
+    if r.priority is "urgent" or r.priority is "high" {
+      return "bb-chip bb-chip-bad"
+    }
+    return "bb-chip bb-chip-warn"
+  }
+
+  sessionEnded(result) {
+    if result.status is 403 and result.data?.code is "LANDLORD_SIGNED_OUT" {
+      this.resetPortal()
+      this.loginMessage = "Your session ended. Sign in again to continue."
+      return true
+    }
+    return false
+  }
+
+  resetPortal() {
+    this.signedIn = false
+    this.summary = null
+    this.landlord = null
+    this.units = []
+    this.unitsLoaded = false
+    this.payouts = []
+    this.payoutsLoaded = false
+    this.repairs = []
+    this.repairsLoaded = false
+    this.tab = "overview"
+    this.step = "details"
+    this.code = ""
+  }
+
+  async load() {
+    this.loading = true
+    this.unreachable = false
+    const result = await useApi("/api/landlord")
+    if result.ok {
+      this.enabled = result.data.enabled
+      this.signedIn = result.data.signedIn
+      this.ended = Boolean(result.data.ended)
+      this.landlord = result.data.landlord ?? null
+      this.summary = result.data.summary ?? null
+      if this.summary {
+        await this.loadDetails()
+      }
+    } else if result.status is 503 {
+      this.unreachable = true
+    }
+    this.loading = false
+  }
+
+  async loadDetails() {
+    const [units, payouts, repairs] = await Promise.all([
+      useApi("/api/landlord/units"),
+      useApi("/api/landlord/payouts"),
+      useApi("/api/landlord/maintenance")
+    ])
+    if this.sessionEnded(units) or this.sessionEnded(payouts) or this.sessionEnded(repairs) {
+      return null
+    }
+    if units.ok {
+      this.units = units.data.data
+      this.unitsLoaded = true
+    }
+    if payouts.ok {
+      this.payouts = payouts.data.data
+      this.payoutsLoaded = true
+    }
+    if repairs.ok {
+      this.repairs = repairs.data.data
+      this.repairsLoaded = true
+    }
+  }
+
+  async sendCode() {
+    if this.loginBusy {
+      return null
+    }
+    this.loginBusy = true
+    this.loginErrors = {}
+    this.loginMessage = ""
+    this.ended = false
+    const result = await useApi("/api/landlord/login", { method: "POST", body: { account_number: this.accountNumber, phone: this.loginPhone } })
+    this.loginBusy = false
+    if result.ok {
+      this.step = "code"
+      this.code = ""
+      this.loginMessage = result.data.message
+      this.resendAt = Date.now() + 60000
+    } else if result.status is 422 {
+      this.loginErrors = result.data.errors ?? {}
+    } else {
+      this.loginMessage = Fmt.firstError(result)
+    }
+  }
+
+  async resend() {
+    if Date.now() < this.resendAt {
+      this.loginMessage = "Wait a minute before asking for another code."
+      return null
+    }
+    await this.sendCode()
+  }
+
+  async confirmCode() {
+    if this.loginBusy {
+      return null
+    }
+    this.loginBusy = true
+    this.loginErrors = {}
+    const result = await useApi("/api/landlord/login/confirm", {
+      method: "POST",
+      body: { account_number: this.accountNumber, phone: this.loginPhone, code: this.code.trim() }
+    })
+    this.loginBusy = false
+    if result.ok {
+      this.step = "details"
+      this.code = ""
+      this.loginMessage = ""
+      await this.load()
+    } else if result.status is 422 {
+      this.loginErrors = result.data.errors ?? {}
+    } else {
+      this.loginMessage = Fmt.firstError(result)
+    }
+  }
+
+  async signOut() {
+    await useApi("/api/landlord/logout", { method: "POST" })
+    this.resetPortal()
+    this.accountNumber = ""
+    this.loginPhone = ""
+    this.loginMessage = ""
+  }
+
+onMount
+  async {
+    this.applyPreset("year")
+    await this.load()
+  }
+
+template
+{{#if loading}}
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+    <div class="bb-card h-48 animate-pulse" data-page-loader="true"></div>
+  </div>
+{{#else if not enabled}}
+  <div class="max-w-2xl mx-auto px-4 sm:px-6 py-10">
+    <h1 class="text-2xl font-bold tracking-tight mb-4">Landlord portal</h1>
+    <div class="tx-alert tx-alert-info"><p class="text-sm">The landlord portal isn't switched on yet. Please contact the office for your statements.</p></div>
+  </div>
+{{#else if unreachable}}
+  <div class="max-w-2xl mx-auto px-4 sm:px-6 py-10">
+    <h1 class="text-2xl font-bold tracking-tight mb-4">Landlord portal</h1>
+    <div class="tx-alert tx-alert-error flex items-center justify-between gap-3">
+      <p class="text-sm">We can't reach the office system right now. Please try again shortly.</p>
+      <button class="tx-btn tx-btn-outline tx-btn-sm" onclick="{{ load() }}"><IconRefresh class="w-4 h-4" /> Retry</button>
+    </div>
+  </div>
+{{#else if not signedIn}}
+  <div class="flex items-center justify-center px-3 sm:px-6 py-6 sm:py-16">
+    <div class="tx-auth tx-glow">
+      <div class="tx-auth-aside">
+        <p class="tx-eyebrow mb-5">Landlord portal</p>
+        <h2 class="text-3xl font-bold tracking-tight mb-3">Your properties, in one place</h2>
+        <p class="text-sm text-muted mb-8 leading-relaxed">The same figures the office works from, whenever you need them.</p>
+        <ul class="space-y-3">
+{{#each perk in perks}}
+          <li class="flex items-start gap-2.5 text-sm text-soft">
+            <span class="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center shrink-0"><IconCheck class="w-3 h-3" /></span>
+            {{ perk }}
+          </li>
+{{/each}}
+        </ul>
+      </div>
+
+      <div class="tx-auth-form">
+        <div class="w-full max-w-sm">
+          <IconKey class="w-6 h-6 text-brand mb-3" />
+          <h1 class="text-2xl font-bold tracking-tight mb-1">Landlord sign in</h1>
+{{#if step is "details"}}
+          <p class="text-sm text-muted mb-6">Enter the landlord account number on your payout statements and the phone number the office has for you. We'll text that phone a 6-digit code.</p>
+{{#else}}
+          <p class="text-sm text-muted mb-6">Enter the 6-digit code we sent to the phone on file for account {{ accountNumber }}.</p>
+{{/if}}
+{{#if ended}}
+          <div class="tx-alert tx-alert-info mb-4" role="status"><p class="text-sm">The landlord account for {{ landlord ? landlord.name : "that number" }} is no longer active. Please contact the office.</p></div>
+{{/if}}
+{{#if loginMessage}}
+          <div class="tx-alert tx-alert-info mb-4" role="status" aria-live="polite"><p class="text-sm">{{ loginMessage }}</p></div>
+{{/if}}
+{{#if step is "details"}}
+          <form onsubmit.prevent="{{ sendCode() }}" novalidate>
+            <label class="tx-label" for="ll-account">Landlord account number</label>
+            <input id="ll-account" class="tx-input" autocomplete="off" inputmode="numeric" autofocus bind:value="{{ accountNumber }}" aria-invalid="{{ fieldError(loginErrors, 'account_number') ? 'true' : 'false' }}" />
+{{#if fieldError(loginErrors, "account_number")}}<p class="text-xs text-coral -mt-3 mb-3">{{ fieldError(loginErrors, "account_number") }}</p>{{/if}}
+            <label class="tx-label" for="ll-phone">Phone number on file</label>
+            <input id="ll-phone" class="tx-input" type="tel" autocomplete="tel" placeholder="0712 345 678" bind:value="{{ loginPhone }}" aria-invalid="{{ fieldError(loginErrors, 'phone') ? 'true' : 'false' }}" />
+{{#if fieldError(loginErrors, "phone")}}<p class="text-xs text-coral -mt-3 mb-3">{{ fieldError(loginErrors, "phone") }}</p>{{/if}}
+            <button type="submit" class="tx-btn tx-btn-primary tx-btn-block justify-center" disabled="{{ loginBusy }}">{{ loginBusy ? "Sending…" : "Text me a code" }}</button>
+          </form>
+{{#else}}
+          <form onsubmit.prevent="{{ confirmCode() }}" novalidate>
+            <label class="tx-label" for="ll-code">6-digit code</label>
+            <input id="ll-code" class="tx-input tracking-[0.4em] text-lg" inputmode="numeric" autocomplete="one-time-code" maxlength="6" autofocus bind:value="{{ code }}" aria-invalid="{{ fieldError(loginErrors, 'code') ? 'true' : 'false' }}" />
+{{#if fieldError(loginErrors, "code")}}<p class="text-xs text-coral -mt-3 mb-3">{{ fieldError(loginErrors, "code") }}</p>{{/if}}
+            <button type="submit" class="tx-btn tx-btn-primary tx-btn-block justify-center" disabled="{{ loginBusy }}">{{ loginBusy ? "Checking…" : "Sign in" }}</button>
+            <div class="flex flex-wrap justify-between gap-2 mt-4 text-sm">
+              <button type="button" class="tx-link" onclick="{{ step = 'details' }}">Use different details</button>
+              <button type="button" class="tx-link" disabled="{{ loginBusy }}" onclick="{{ resend() }}">Send a new code</button>
+            </div>
+          </form>
+{{/if}}
+          <p class="text-xs text-muted mt-8">Wrong phone number on file? <a href="/contact" class="tx-link">Contact the office</a> to update it. A tenant? <a href="/tenant" class="tx-link">Go to the tenant portal</a>.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+{{#else}}
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-5 sm:py-8">
+    <div class="flex flex-wrap items-end justify-between gap-3 mb-6">
+      <div class="min-w-0">
+        <p class="tx-eyebrow mb-1">Landlord portal</p>
+        <h1 class="text-2xl font-bold tracking-tight">{{ summary.landlord.name }}</h1>
+        <p class="text-sm text-muted">Account {{ summary.landlord.account_number }} · {{ totals.properties }} {{ totals.properties is 1 ? "property" : "properties" }} · {{ totals.units }} units</p>
+      </div>
+      <button class="tx-btn tx-btn-outline tx-btn-sm" onclick="{{ signOut() }}"><IconLogout class="w-4 h-4" /> Sign out</button>
+    </div>
+
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
+      <div class="tx-panel p-4">
+        <p class="text-xs text-muted">Collected, not yet paid out</p>
+        <p class="text-xl font-semibold">{{ Fmt.kes(totals.collected_since_payout) }}</p>
+      </div>
+      <div class="tx-panel p-4">
+        <p class="text-xs text-muted">Paid to you this year</p>
+        <p class="text-xl font-semibold text-mint">{{ Fmt.kes(totals.paid_this_year) }}</p>
+      </div>
+      <div class="tx-panel p-4">
+        <p class="text-xs text-muted">Occupancy</p>
+        <p class="text-xl font-semibold">{{ totals.occupancy_rate }}%</p>
+        <p class="text-xs text-muted">{{ totals.occupied }} of {{ totals.units }} let · {{ totals.vacant }} vacant</p>
+      </div>
+      <div class="tx-panel p-4">
+        <p class="text-xs text-muted">Owed by tenants</p>
+        <p class="{{ 'text-xl font-semibold ' + (totals.arrears > 0 ? 'text-coral' : '') }}">{{ Fmt.kes(totals.arrears) }}</p>
+      </div>
+      <div class="tx-panel p-4 col-span-2 lg:col-span-1">
+        <p class="text-xs text-muted">Rent lost to vacancies</p>
+        <p class="text-xl font-semibold">{{ Fmt.kes(totals.vacancy_loss) }}<span class="text-xs text-muted font-normal"> /month</span></p>
+      </div>
+    </div>
+
+{{#if totals.payouts_processing > 0}}
+    <div class="tx-alert tx-alert-info mb-4" role="status"><p class="text-sm">{{ totals.payouts_processing }} payout{{ totals.payouts_processing is 1 ? " is" : "s are" }} being processed. <button type="button" class="tx-link" onclick="{{ tab = 'payouts' }}">See payouts</button></p></div>
+{{/if}}
+
+    <div class="bb-seg bb-seg-full sm:inline-flex mb-5 whitespace-nowrap overflow-x-auto max-w-full" role="tablist" aria-label="Landlord portal sections">
+      <button type="button" role="tab" aria-selected="{{ tab is 'overview' }}" class="{{ segClass('overview', tab) }}" onclick="{{ tab = 'overview' }}"><IconChartBar class="w-4 h-4" /> Overview</button>
+      <button type="button" role="tab" aria-selected="{{ tab is 'units' }}" class="{{ segClass('units', tab) }}" onclick="{{ tab = 'units' }}"><IconHome class="w-4 h-4" /> Units{{ totals.vacant > 0 ? " · " + totals.vacant + " vacant" : "" }}</button>
+      <button type="button" role="tab" aria-selected="{{ tab is 'payouts' }}" class="{{ segClass('payouts', tab) }}" onclick="{{ tab = 'payouts' }}"><IconBanknote class="w-4 h-4" /> Payouts & statements</button>
+      <button type="button" role="tab" aria-selected="{{ tab is 'repairs' }}" class="{{ segClass('repairs', tab) }}" onclick="{{ tab = 'repairs' }}"><IconTool class="w-4 h-4" /> Repairs{{ totals.open_maintenance > 0 ? " · " + totals.open_maintenance : "" }}</button>
+    </div>
+
+{{#if tab is "overview"}}
+    <div class="grid xl:grid-cols-[1fr_340px] gap-6 items-start">
+      <div class="flex flex-col gap-6 min-w-0">
+        <section class="tx-panel p-5" aria-labelledby="chart-heading">
+          <div class="flex flex-wrap items-baseline justify-between gap-2 mb-1">
+            <h2 id="chart-heading" class="font-semibold">Payouts, last 12 months</h2>
+            <p class="text-sm text-muted">{{ Fmt.kes(monthlyTotal) }} in total</p>
+          </div>
+          <p class="text-sm text-soft h-5 mb-3" aria-live="polite">{{ hoverBar >= 0 ? monthLabel(monthly[hoverBar].month) + ": " + Fmt.kes(monthly[hoverBar].paid) : "Highest month " + Fmt.kes(monthlyMax > 1 ? monthlyMax : 0) }}</p>
+          <div class="bb-bars" role="img" aria-label="{{ 'Payouts per month over the last 12 months, ' + Fmt.kes(monthlyTotal) + ' in total.' }}" onmouseleave="{{ hoverBar = -1 }}">
+{{#each m, i in monthly}}
+            <div class="bb-bar-slot" onmouseenter="{{ hoverBar = i }}" title="{{ monthLabel(m.month) }}: {{ Fmt.kes(m.paid) }}"><div class="bb-bar {{ hoverBar is i ? 'is-hover' : '' }}" style="{{ barHeight(m.paid, monthlyMax) }}"></div></div>
+{{/each}}
+          </div>
+          <div class="flex justify-between text-xs text-muted mt-2"><span>{{ monthly.length ? monthLabel(monthly[0].month) : "" }}</span><span>{{ monthly.length ? monthLabel(monthly[monthly.length - 1].month) : "" }}</span></div>
+        </section>
+
+        <section class="tx-panel">
+          <h2 class="font-semibold p-4 border-b border-line">Your properties</h2>
+{{#if properties.length is 0}}
+          <p class="p-4 text-sm text-muted">No properties on your account yet.</p>
+{{#else}}
+          <div class="overflow-x-auto">
+            <table class="bb-table">
+              <thead><tr><th>Property</th><th>Occupancy</th><th>Rent roll</th><th>Owed</th><th>Since last payout</th><th>Last payout</th></tr></thead>
+              <tbody>
+{{#each p in properties}}
+                <tr>
+                  <td>
+                    <p class="font-medium">{{ p.name }}</p>
+                    <p class="text-xs text-muted">{{ p.location }}{{#if p.listing_slug}} · <a href="{{ '/properties/' + p.listing_slug }}" class="tx-link">on the website</a>{{/if}}</p>
+                  </td>
+                  <td class="whitespace-nowrap">{{ p.occupied }}/{{ p.units }} <span class="text-xs text-muted">({{ occupancy(p) }}%)</span></td>
+                  <td class="whitespace-nowrap">{{ Fmt.kes(p.rent_roll) }}<span class="text-xs text-muted"> of {{ Fmt.kes(p.potential_rent) }}</span></td>
+                  <td class="{{ 'whitespace-nowrap ' + (p.arrears > 0 ? 'text-coral font-medium' : '') }}">{{ Fmt.kes(p.arrears) }}</td>
+                  <td class="whitespace-nowrap">{{ Fmt.kes(p.collected_since_payout) }}{{#if p.estimated_fee > 0}}<p class="text-xs text-muted">less ~{{ Fmt.kes(p.estimated_fee) }} fee ({{ p.management_fee_percent }}%)</p>{{/if}}</td>
+                  <td class="whitespace-nowrap">{{#if p.last_payout}}{{ Fmt.kes(p.last_payout.amount) }}<p class="text-xs text-muted">{{ Fmt.date(p.last_payout.date) }}</p>{{#else}}<span class="text-muted">None yet</span>{{/if}}</td>
+                </tr>
+{{/each}}
+              </tbody>
+            </table>
+          </div>
+{{/if}}
+        </section>
+      </div>
+
+      <aside class="flex flex-col gap-4 xl:sticky xl:top-20">
+        <section class="tx-panel p-5">
+          <h2 class="font-semibold mb-2 flex items-center gap-2"><IconMobileMoney class="w-5 h-5 text-brand" /> Where payouts go</h2>
+          <p class="text-sm">{{ payoutMode(summary.payout.mode) }}{{ summary.payout.destination ? " · " + summary.payout.destination : "" }}</p>
+          <p class="text-xs text-muted mt-2">To change where you're paid, contact the office. For your security this can't be changed online.</p>
+        </section>
+        <section class="tx-panel p-5">
+          <h2 class="font-semibold mb-3">All time</h2>
+          <dl class="text-sm grid grid-cols-[1fr_auto] gap-x-4 gap-y-1.5">
+            <dt class="text-muted">Paid to you</dt><dd class="font-semibold text-right">{{ Fmt.kes(totals.paid_all_time) }}</dd>
+            <dt class="text-muted">Monthly rent roll</dt><dd class="font-semibold text-right">{{ Fmt.kes(totals.rent_roll) }}</dd>
+            <dt class="text-muted">At full occupancy</dt><dd class="font-semibold text-right">{{ Fmt.kes(totals.potential_rent) }}</dd>
+            <dt class="text-muted">Open repairs</dt><dd class="font-semibold text-right">{{ totals.open_maintenance }}</dd>
+          </dl>
+        </section>
+        <section class="tx-panel p-5">
+          <h2 class="font-semibold mb-1 flex items-center gap-2"><IconDocumentText class="w-5 h-5 text-brand" /> Income statement</h2>
+          <p class="text-sm text-muted mb-3">Every payout this year with fees and deductions, as a PDF.</p>
+          <div class="flex flex-wrap gap-2">
+            <a href="{{ statementUrl }}" target="_blank" rel="noopener" class="tx-btn tx-btn-primary tx-btn-sm"><IconDocumentText class="w-4 h-4" /> View</a>
+            <button type="button" class="tx-btn tx-btn-outline tx-btn-sm" onclick="{{ tab = 'payouts' }}">Other periods</button>
+          </div>
+        </section>
+      </aside>
+    </div>
+{{/if}}
+
+{{#if tab is "units"}}
+    <section class="tx-panel">
+      <div class="flex flex-wrap items-center justify-between gap-3 p-4 border-b border-line">
+        <h2 class="font-semibold">Units</h2>
+        <div class="bb-seg" role="radiogroup" aria-label="Show units">
+          <button type="button" role="radio" aria-checked="{{ unitFilter is 'vacant' }}" class="{{ segClass('vacant', unitFilter) }}" onclick="{{ unitFilter = 'vacant' }}">Vacant ({{ vacantUnits.length }})</button>
+          <button type="button" role="radio" aria-checked="{{ unitFilter is 'arrears' }}" class="{{ segClass('arrears', unitFilter) }}" onclick="{{ unitFilter = 'arrears' }}">In arrears</button>
+          <button type="button" role="radio" aria-checked="{{ unitFilter is 'all' }}" class="{{ segClass('all', unitFilter) }}" onclick="{{ unitFilter = 'all' }}">All ({{ units.length }})</button>
+        </div>
+      </div>
+{{#if not unitsLoaded}}
+      <p class="p-4 text-sm text-muted">Couldn't load your units. <button class="tx-link" onclick="{{ loadDetails() }}">Try again</button></p>
+{{#else if shownUnits.length is 0}}
+      <p class="p-4 text-sm text-muted">{{ unitFilter is "vacant" ? "No vacant units. Every unit is let." : (unitFilter is "arrears" ? "No tenant owes anything right now." : "No units yet.") }}</p>
+{{#else}}
+      <div class="overflow-x-auto">
+        <table class="bb-table">
+          <thead><tr><th>Unit</th><th>Type</th><th>Rent</th><th>Status</th><th>On the website</th></tr></thead>
+          <tbody>
+{{#each u in shownUnits}}
+            <tr>
+              <td><p class="font-medium">{{ u.name }}</p><p class="text-xs text-muted">{{ u.property.name }}</p></td>
+              <td class="whitespace-nowrap">{{ u.type }}</td>
+              <td class="whitespace-nowrap">{{ Fmt.kes(u.rent) }}</td>
+              <td>
+{{#if u.vacant}}
+                <span class="bb-chip bb-chip-warn">{{ vacantFor(u) }}</span>
+{{#else}}
+                <p class="text-sm">{{ u.tenant.name or "Let" }}</p>
+{{#if u.tenant.arrears > 0}}<p class="text-xs text-coral">owes {{ Fmt.kes(u.tenant.arrears) }}</p>{{#else}}<p class="text-xs text-mint">up to date</p>{{/if}}
+{{/if}}
+              </td>
+              <td class="whitespace-nowrap">
+{{#if u.listing_slug}}
+                <a href="{{ '/properties/' + u.listing_slug }}" class="tx-btn tx-btn-ghost tx-btn-sm">Advertised <IconExternalLink class="w-3.5 h-3.5" /></a>
+{{#else if u.vacant}}
+                <span class="text-xs text-muted">Not advertised</span>
+{{#else}}
+                <span class="text-xs text-muted">—</span>
+{{/if}}
+              </td>
+            </tr>
+{{/each}}
+          </tbody>
+        </table>
+      </div>
+{{#if unitFilter is "vacant" and vacantUnits.length > 0}}
+      <p class="p-4 text-xs text-muted border-t border-line">Vacant units the office has published appear on the website's vacant units page automatically and come off when a tenant moves in. Want a unit advertised or held back? <a href="/contact" class="tx-link">Tell the office</a>.</p>
+{{/if}}
+{{/if}}
+    </section>
+{{/if}}
+
+{{#if tab is "payouts"}}
+    <div class="flex flex-col gap-6">
+      <section class="tx-panel p-5" aria-labelledby="statement-heading">
+        <h2 id="statement-heading" class="font-semibold mb-1 flex items-center gap-2"><IconDocumentText class="w-5 h-5 text-brand" /> Income statement</h2>
+        <p class="text-sm text-muted mb-4">Every payout made in a period, with rent collected, management fees, expenses and what was paid to you, as a PDF.</p>
+        <div class="grid sm:grid-cols-3 gap-x-3">
+          <div>
+            <label class="tx-label" for="ls-period">Period</label>
+            <select id="ls-period" class="tx-input" onchange="{{ applyPreset(event.target.value) }}">
+              <option value="month" selected="{{ preset is 'month' }}">This month</option>
+              <option value="last-month" selected="{{ preset is 'last-month' }}">Last month</option>
+              <option value="3m" selected="{{ preset is '3m' }}">Last 3 months</option>
+              <option value="12m" selected="{{ preset is '12m' }}">Last 12 months</option>
+              <option value="year" selected="{{ preset is 'year' }}">This year</option>
+              <option value="last-year" selected="{{ preset is 'last-year' }}">Last year</option>
+              <option value="custom" selected="{{ preset is 'custom' }}">Custom dates</option>
+            </select>
+          </div>
+          <div>
+            <label class="tx-label" for="ls-from">From</label>
+            <input id="ls-from" class="tx-input" type="date" max="{{ today() }}" value="{{ statementFrom }}" onchange="{{ setStatementDate('statementFrom', event.target.value) }}" />
+          </div>
+          <div>
+            <label class="tx-label" for="ls-to">To</label>
+            <input id="ls-to" class="tx-input" type="date" max="{{ today() }}" value="{{ statementTo }}" onchange="{{ setStatementDate('statementTo', event.target.value) }}" />
+          </div>
+        </div>
+{{#if statementError}}
+        <p class="text-xs text-coral -mt-2 mb-3" role="alert">{{ statementError }}</p>
+{{#else}}
+        <div class="flex flex-wrap gap-2">
+          <a href="{{ statementUrl }}" target="_blank" rel="noopener" class="tx-btn tx-btn-primary tx-btn-sm"><IconDocumentText class="w-4 h-4" /> View statement</a>
+          <a href="{{ statementUrl + '&download=1' }}" class="tx-btn tx-btn-outline tx-btn-sm"><IconDownload class="w-4 h-4" /> Download PDF</a>
+        </div>
+{{/if}}
+      </section>
+
+      <section class="tx-panel">
+        <h2 class="font-semibold p-4 border-b border-line">Payouts</h2>
+{{#if not payoutsLoaded}}
+        <p class="p-4 text-sm text-muted">Couldn't load your payouts. <button class="tx-link" onclick="{{ loadDetails() }}">Try again</button></p>
+{{#else if payouts.length is 0}}
+        <p class="p-4 text-sm text-muted">No payouts yet.</p>
+{{#else}}
+        <div class="overflow-x-auto">
+          <table class="bb-table">
+            <thead><tr><th>Date</th><th>Property</th><th>Collected</th><th>Deductions</th><th>Paid to you</th><th>Status</th><th><span class="sr-only">PDF</span></th></tr></thead>
+            <tbody>
+{{#each p in payouts}}
+              <tr>
+                <td class="whitespace-nowrap">{{ Fmt.date(p.paid_at or p.created_at) }}</td>
+                <td><p class="font-medium">{{ p.property.name }}</p><p class="text-xs text-muted">{{ p.period }}</p></td>
+                <td class="whitespace-nowrap">{{ Fmt.kes(p.total_collected) }}</td>
+                <td class="whitespace-nowrap text-muted">{{ Fmt.kes(p.total_deductions) }}</td>
+                <td class="whitespace-nowrap font-semibold">{{ Fmt.kes(p.paid) }}</td>
+                <td><span class="{{ payoutChip(p.status) }}">{{ payoutStatus(p.status) }}</span></td>
+                <td class="whitespace-nowrap text-right">
+                  <a href="{{ payoutPdf(p, false) }}" target="_blank" rel="noopener" class="tx-btn tx-btn-ghost tx-btn-sm" aria-label="{{ 'View the ' + p.period + ' payout for ' + p.property.name + ' as PDF' }}"><IconDocumentText class="w-4 h-4" /> PDF</a>
+                  <a href="{{ payoutPdf(p, true) }}" class="tx-icon-btn" aria-label="{{ 'Download the ' + p.period + ' payout for ' + p.property.name }}" title="Download"><IconDownload class="w-4 h-4" /></a>
+                </td>
+              </tr>
+{{/each}}
+            </tbody>
+          </table>
+        </div>
+{{/if}}
+      </section>
+    </div>
+{{/if}}
+
+{{#if tab is "repairs"}}
+    <section class="tx-panel">
+      <div class="flex flex-wrap items-center justify-between gap-3 p-4 border-b border-line">
+        <div>
+          <h2 class="font-semibold">Repairs on your properties</h2>
+          <p class="text-xs text-muted">Reported by tenants or the office. The office arranges the work; costs billed to you show on your payouts.</p>
+        </div>
+        <div class="bb-seg" role="radiogroup" aria-label="Show repairs">
+          <button type="button" role="radio" aria-checked="{{ repairFilter is 'open' }}" class="{{ segClass('open', repairFilter) }}" onclick="{{ repairFilter = 'open' }}">Open ({{ openRepairs.length }})</button>
+          <button type="button" role="radio" aria-checked="{{ repairFilter is 'all' }}" class="{{ segClass('all', repairFilter) }}" onclick="{{ repairFilter = 'all' }}">All</button>
+        </div>
+      </div>
+{{#if not repairsLoaded}}
+      <p class="p-4 text-sm text-muted">Couldn't load repairs. <button class="tx-link" onclick="{{ loadDetails() }}">Try again</button></p>
+{{#else if shownRepairs.length is 0}}
+      <p class="p-4 text-sm text-muted">{{ repairFilter is "open" ? "No open repairs." : "No repairs recorded yet." }}</p>
+{{#else}}
+      <ul class="divide-y divide-line">
+{{#each r in shownRepairs}}
+        <li class="p-4 flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <p class="text-sm font-medium flex items-center gap-1.5">{{#if r.open and r.priority is "urgent"}}<IconExclamationTriangle class="w-4 h-4 text-coral shrink-0" />{{/if}}{{ r.title }} <span class="text-xs text-muted font-normal">#{{ r.id }}</span></p>
+            <p class="text-xs text-muted">{{ r.property }}{{ r.unit ? " · " + r.unit : "" }} · {{ Fmt.label(r.category) }} · {{ Fmt.label(r.priority) }} priority · {{ r.source is "tenant_portal" ? "reported by tenant" : "logged by office" }} {{ Fmt.ago(r.created_at) }}</p>
+{{#if r.description}}<p class="text-sm text-soft mt-1 line-clamp-2">{{ r.description }}</p>{{/if}}
+            <p class="text-xs text-muted mt-1">{{ r.vendor ? "Fundi: " + r.vendor + " · " : "" }}{{ r.scheduled_at and r.open ? "Visit " + Fmt.dateTime(r.scheduled_at) + " · " : "" }}{{ r.actual_cost ? "Cost " + Fmt.kes(r.actual_cost) : (r.estimated_cost ? "Estimate " + Fmt.kes(r.estimated_cost) : "") }}{{ r.resolved_at ? " · fixed " + Fmt.date(r.resolved_at) : "" }}</p>
+          </div>
+          <span class="{{ repairChip(r) }} shrink-0">{{ repairStatus(r.status) }}</span>
+        </li>
+{{/each}}
+      </ul>
+{{/if}}
+    </section>
+{{/if}}
+  </div>
+{{/if}}

@@ -1,5 +1,5 @@
-// Shared look for tenant documents (invoices, statements) drawn with
-// @tylix/pdf. Server-only.
+// Shared look for portal documents (tenant invoices and statements,
+// landlord payouts and income statements) drawn with @tylix/pdf. Server-only.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -138,14 +138,15 @@ export function facts(rows: Array<[string, string]>): Content {
     };
 }
 
-export function sectionTitle(text: string): Content {
-    return { text: text.toUpperCase(), bold: true, size: 8.5, color: COLORS.muted, characterSpacing: 0.6, margin: [0, 0, 6, 0] };
+// `top` adds space above, for a section that follows a table.
+export function sectionTitle(text: string, top = 0): Content {
+    return { text: text.toUpperCase(), bold: true, size: 8.5, color: COLORS.muted, characterSpacing: 0.6, margin: [top, 0, 6, 0] };
 }
 
-export function footerFor(siteName: string) {
+export function footerFor(siteName: string, portal = "tenant portal") {
     return {
         columns: [
-            { text: `${siteName} · tenant portal · generated ${longDate(todayIso())}`, size: 8, color: COLORS.muted },
+            { text: `${siteName} · ${portal} · generated ${longDate(todayIso())}`, size: 8, color: COLORS.muted },
             { text: "Page {page} of {pages}", size: 8, color: COLORS.muted, align: "right" as const, width: "auto" },
         ],
         margin: [0, 0, 0, 0],
