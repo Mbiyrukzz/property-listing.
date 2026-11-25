@@ -42,7 +42,7 @@ const now = () => new Date().toISOString();
 async function log(trigger: string, event: string, externalId: number | null, outcome: SyncOutcome, startedAt: number) {
     try {
         await SyncLog.create({
-            trigger,
+            triggered_by: trigger,
             event,
             external_id: externalId,
             status: outcome.status,

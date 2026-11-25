@@ -463,7 +463,7 @@ export class AdminController {
         const logs = (await SyncLog.query().latest().limit(60).get()) as Row[];
         const fromProperman = (await Listing.where("source", "properman").get()) as ListingRow[];
         const lastFull = (await SyncLog.query().where("event", "full").latest().first()) as Row | null;
-        const lastWebhook = (await SyncLog.query().where("trigger", "webhook").latest().first()) as Row | null;
+        const lastWebhook = (await SyncLog.query().where("triggered_by", "webhook").latest().first()) as Row | null;
         let host = "";
         try {
             host = process.env.HQ_URL ? new URL(process.env.HQ_URL).host : "";
@@ -483,7 +483,7 @@ export class AdminController {
             lastFull: lastFull ? { at: lastFull.created_at, status: lastFull.status, message: lastFull.message } : null,
             lastWebhook: lastWebhook ? { at: lastWebhook.created_at, status: lastWebhook.status, message: lastWebhook.message } : null,
             logs: logs.map((l) => ({
-                id: l.id, trigger: l.trigger, event: l.event, externalId: l.external_id, status: l.status,
+                id: l.id, trigger: l.triggered_by, event: l.event, externalId: l.external_id, status: l.status,
                 message: l.message, upserted: l.upserted, removed: l.removed, durationMs: l.duration_ms, at: l.created_at,
             })),
         });

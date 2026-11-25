@@ -31,7 +31,7 @@ export class WebhookController {
         const raw = String((req as unknown as { rawBody?: string }).rawBody ?? "");
         const ok = verifyWebhookSignature(raw, req.headers["x-properman-timestamp"], req.headers["x-properman-signature"]);
         if (!ok) {
-            await SyncLog.create({ trigger: "webhook", event: "rejected", status: "error", message: "Bad or expired signature." }).catch(() => {});
+            await SyncLog.create({ triggered_by: "webhook", event: "rejected", status: "error", message: "Bad or expired signature." }).catch(() => {});
             res.status(401);
             return res.json({ error: "Invalid signature." });
         }
