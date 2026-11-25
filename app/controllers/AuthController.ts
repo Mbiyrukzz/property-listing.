@@ -222,10 +222,29 @@ export class AuthController {
             return res.status(500).json({ error: "Failed to create user." });
         }
 
-        await this.sendVerification(user);
+        // The account exists from here on, so a mail problem (wrong SMTP
+        // details, a rejected API key, the provider being down) must not turn
+        // the sign-up into a 500: the person would retry and be told the
+        // email is already registered. Log it (mail_logs also records the
+        // failed send) and let them use "resend verification" later.
+        try {
+            await this.sendVerification(user);
+        } catch (err) {
+            console.error(
+                `[auth] verification email to user ${user.id} failed:`,
+                err instanceof Error ? err.message : err,
+            );
+            return res.status(201).json({
+                user: User.toSafeObject(user),
+                emailSent: false,
+                message:
+                    "Your account was created, but we couldn't send the verification email just now. Try resending it in a few minutes.",
+            });
+        }
 
         return res.status(201).json({
             user: User.toSafeObject(user),
+            emailSent: true,
             message: "Registration successful. Check your email to verify your account before logging in.",
         });
     }

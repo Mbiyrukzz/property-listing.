@@ -17,6 +17,9 @@ state
   error: ""
   submitting: false
   registered: false
+  emailSent: true
+  resending: false
+  resendNote: ""
   perks: [
     "Save properties you like",
     "Book viewings and apply online",
@@ -51,6 +54,22 @@ computed
   }
 
 action
+  async resend() {
+    this.resending = true
+    this.resendNote = ""
+    try {
+      const result = await useApi("/api/auth/resend-verification", {
+        method: "POST",
+        body: { email: this.email }
+      })
+      this.resendNote = result.ok ? "Sent. Check your inbox (and spam) in a minute or two." : (result.error ?? "Couldn't resend just now. Try again shortly.")
+    } catch (err) {
+      this.resendNote = "Network error. Check your connection and try again."
+    } finally {
+      this.resending = false
+    }
+  }
+
   // Where to go after signing in: ?next=/some/path on this site, else the
   // dashboard. Only same-site paths ("/x", never "//host" or "/\host").
   readNext() {
@@ -131,6 +150,7 @@ action
 
       if result.ok {
         this.registered = true
+        this.emailSent = result.data?.emailSent is not false
       } else {
         this.error = this.messageFor(result)
       }
@@ -173,11 +193,21 @@ template
           <div class="w-11 h-11 rounded-lg bg-brand/10 flex items-center justify-center mb-5">
             <IconCheck class="w-5 h-5 text-link" />
           </div>
-          <h1 class="text-2xl font-bold tracking-tight mb-2">Check your email</h1>
+          <h1 class="text-2xl font-bold tracking-tight mb-2">{{ emailSent ? "Check your email" : "Account created" }}</h1>
+{{#if emailSent}}
           <p class="text-sm text-muted mb-8">
             We sent a verification link to <span class="text-ink">{{ email }}</span>.
             Click it, then log in.
           </p>
+{{#else}}
+          <p class="text-sm text-muted mb-4">
+            Your account is ready, but the verification email to <span class="text-ink">{{ email }}</span> didn't go out. Try sending it again in a minute.
+          </p>
+          <button type="button" class="tx-btn tx-btn-outline tx-btn-block mb-3" disabled="{{ resending }}" onclick="{{ resend() }}">{{ resending ? "Sending…" : "Resend verification email" }}</button>
+{{#if resendNote}}
+          <p class="text-sm text-muted mb-5" aria-live="polite">{{ resendNote }}</p>
+{{/if}}
+{{/if}}
           <a href="/login" class="tx-btn tx-btn-primary tx-btn-block">
             Go to login
           </a>
