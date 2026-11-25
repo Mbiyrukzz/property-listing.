@@ -1,7 +1,6 @@
 page Login
 
 import { IconCheck } from "tylix-icons"
-import OAuthButtons from "./components/OAuthButtons"
 
 title "Log in"
 
@@ -138,8 +137,6 @@ template
             <p class="text-sm">{{ error }}</p>
           </div>
 {{/if}}
-
-          <OAuthButtons returnTo="{{ next }}" />
 
           <label for="email" class="tx-label">Email</label>
           <input

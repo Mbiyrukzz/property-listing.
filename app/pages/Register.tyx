@@ -1,7 +1,6 @@
 page Register
 
 import { IconCheck } from "tylix-icons"
-import OAuthButtons from "./components/OAuthButtons"
 
 title "Create account"
 
@@ -191,8 +190,6 @@ template
             <p class="text-sm">{{ error }}</p>
           </div>
 {{/if}}
-
-          <OAuthButtons returnTo="{{ next }}" />
 
           <label for="name" class="tx-label">Name</label>
           <input
