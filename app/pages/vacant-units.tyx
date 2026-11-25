@@ -1,6 +1,6 @@
 page VacantUnits
 
-import { IconSearch, IconMapPin, IconBed, IconHome, IconRefresh, IconChevronLeft, IconChevronRight } from "tylix-icons"
+import { IconSearch, IconMapPin, IconBed, IconBath, IconHome, IconRefresh, IconChevronLeft, IconChevronRight } from "tylix-icons"
 
 title "Vacant units to rent today | Barani Better Homes"
 
@@ -140,6 +140,9 @@ template
           <p class="text-sm text-muted line-clamp-3">{{ u.summary }}</p>
 {{/if}}
           <div class="mt-auto pt-2 flex flex-wrap items-center gap-1.5">
+{{#if u.bathrooms}}
+            <span class="inline-flex items-center gap-1 rounded-md bg-well border border-line text-xs text-soft px-2 py-1"><IconBath class="w-3.5 h-3.5" /> {{ Fmt.baths(u.bathrooms) }}</span>
+{{/if}}
 {{#if u.type}}
             <span class="inline-flex items-center gap-1 rounded-md bg-well border border-line text-xs text-soft px-2 py-1"><IconBed class="w-3.5 h-3.5" /> {{ u.type }}</span>
 {{/if}}

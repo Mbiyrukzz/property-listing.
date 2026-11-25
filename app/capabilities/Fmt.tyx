@@ -87,6 +87,14 @@ action
     return v + (v is 1 ? " bed" : " beds")
   }
 
+  baths(n) {
+    if n is null or n is undefined or n is "" or Number(n) <= 0 {
+      return ""
+    }
+    const v = Number(n)
+    return v + (v is 1 ? " bath" : " baths")
+  }
+
   whatsapp(phone, text) {
     let digits = String(phone ?? "").replace(/\D/g, "")
     if not digits {

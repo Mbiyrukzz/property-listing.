@@ -194,7 +194,7 @@ template
               <span class="bb-icon-tile bb-icon-tile-sm bb-tint-leaf hidden sm:inline-flex"><IconHome /></span>
               <div class="min-w-0 flex-1">
                 <p class="text-sm font-semibold truncate">{{ u.name }}</p>
-                <p class="text-xs text-muted truncate">{{ u.type }}{{ u.isFurnished ? " · furnished" : "" }}</p>
+                <p class="text-xs text-muted truncate">{{ u.type }}{{ u.bathrooms ? " · " + Fmt.baths(u.bathrooms) : "" }}{{ u.isFurnished ? " · furnished" : "" }}</p>
               </div>
               <p class="text-sm font-bold whitespace-nowrap">{{ Fmt.price(u.rent, "rent") }}</p>
               <a class="tx-btn tx-btn-primary tx-btn-sm" href="{{ applyHref + '?unit=' + u.id }}">Apply</a>
